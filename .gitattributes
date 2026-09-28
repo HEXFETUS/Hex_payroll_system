@@ -1,0 +1,15 @@
+# Normalize all text files to LF in the repository, regardless of the
+# contributor's operating system. Prevents CRLF noise in diffs, which matters
+# most for database/migrations/**/*.sql (the authoritative schema history).
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+
+pnpm-lock.yaml -diff linguist-generated

@@ -1,0 +1,21 @@
+{
+  "name": "@hexpayroll/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Electron desktop shell for Hex Payroll. Owns main + preload only; the renderer is apps/web.",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "package": "electron-builder --config electron-builder.yml"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.3",
+    "electron": "44.4.5",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "typescript": "6.0.3"
+  }
+}

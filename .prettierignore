@@ -1,0 +1,9 @@
+node_modules
+dist
+out
+build
+release
+coverage
+pnpm-lock.yaml
+database/migrations
+*.tsbuildinfo

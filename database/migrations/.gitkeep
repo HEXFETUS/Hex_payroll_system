@@ -1,0 +1,24 @@
+# This directory holds the AUTHORITATIVE database schema history.
+#
+# Phase 0 intentionally contains NO migration files — it establishes the
+# foundation (PostgreSQL, the runner, the API, Electron) before any schema or
+# payroll-domain complexity exists.
+#
+# Phase 1 will add, in order:
+#   0001_extensions.sql
+#   0002_core_functions.sql
+#   0003_nodes.sql
+#   0004_users.sql
+#   0005_employees.sql
+#   0006_outbox.sql
+#   0007_sync_cursor.sql
+#
+# RULES (see README.md):
+#   - These .sql files are the single source of truth for the schema.
+#   - They are applied by our own runner (apps/api/src/db/migrate.ts), NOT by
+#     `drizzle-kit push` (which is banned) and NOT by drizzle's migrator.
+#   - Numbered NNNN_name.sql, applied in lexical order, up-only.
+#   - A migration that has been merged is immutable; fix forward with a new
+#     migration instead of editing history.
+#
+# This placeholder exists only because git does not track empty directories.

@@ -1,0 +1,33 @@
+packages:
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm >= 10 blocks dependency postinstall scripts by default, as a supply-chain
+# protection. pnpm 11 expresses that decision with `allowBuilds` (a map of
+# package name -> boolean). Packages not listed here are skipped, and pnpm then
+# fails dependency-verification with ERR_PNPM_IGNORED_BUILDS — so every package
+# it flags must get an explicit decision below.
+#
+# ELECTRON IS SPECIAL (verified on electron@44.4.5): its package.json declares NO
+# scripts at all. Electron ships install.js as a bin named `install-electron`
+# instead, so no allowlist entry can cause its binary to be downloaded. The entry
+# below exists only because pnpm still tracks electron as a package that "has a
+# build"; its actual binary is fetched by the root `postinstall` script in
+# package.json. If electron.exe is ever missing, run:
+#
+#   pnpm --filter @hexpayroll/desktop exec install-electron
+#
+# The entries below are deliberate decisions, never a blanket opt-in:
+#   electron            -> bookkeeping only; see note above.
+#   esbuild             -> places its platform-native binary. (Its binary also
+#                          arrives via the @esbuild/win32-x64 optional dependency,
+#                          so Vite builds happen to work either way, but this is
+#                          its intended installation path.)
+#   electron-winstaller -> only used by electron-builder when producing installers.
+#                          Not needed in Phase 0; revisit in Phase 4.
+#
+# Never use `pnpm install --allow-all` / `dangerouslyAllowAllBuilds` in this repo.
+allowBuilds:
+  electron: true
+  esbuild: true
+  electron-winstaller: false

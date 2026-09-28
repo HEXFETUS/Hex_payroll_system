@@ -1,0 +1,29 @@
+{
+  "name": "@hexpayroll/web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hex Payroll React UI. Consumed by the Electron desktop shell today and by a future browser build, with no Electron coupling.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@hexpayroll/shared": "workspace:*",
+    "@tanstack/react-query": "5.104.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router-dom": "7.18.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "5.2.0",
+    "tailwindcss": "4.3.3",
+    "typescript": "6.0.3",
+    "vite": "7.3.6"
+  }
+}
