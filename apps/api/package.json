@@ -9,7 +9,10 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "migrate": "tsx src/cli/migrate.ts",
+    "auth:create-user": "tsx src/cli/create-user.ts",
+    "test": "tsx --test test/*.test.ts"
   },
   "dependencies": {
     "@hexpayroll/payroll-engine": "workspace:*",

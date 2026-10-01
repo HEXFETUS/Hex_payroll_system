@@ -4,6 +4,9 @@ import pino from 'pino';
 import { env } from './config/env.js';
 import { corsMiddleware } from './middleware/cors.js';
 import { healthRouter } from './routes/health.js';
+import { createAuthRouter } from './routes/auth.js';
+import { createAuthService } from './auth/service.js';
+import { pool } from './db/pool.js';
 
 export const logger = pino({ level: env.LOG_LEVEL });
 
@@ -50,6 +53,7 @@ export function createApp(): Express {
   // Before the body parser: a preflight carries no body, and a rejected origin
   // must not be able to make the server parse anything.
   app.use(corsMiddleware);
+  app.use('/api/auth', createAuthRouter(createAuthService(pool)));
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
 
