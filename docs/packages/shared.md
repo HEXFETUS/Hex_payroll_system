@@ -79,8 +79,11 @@ constant:
 | `timestamp`        | ISO timestamp produced by the API                                                           |
 | `error?`           | present only on the error variant                                                           |
 
-The API adds `databaseName` and `connectedAs` to the 200 response (see
-[`../apps/api.md`](../apps/api.md)).
+`healthStatusSchema` validates the discriminated readiness response at runtime.
+`parseHealthResponse` also checks that HTTP 200 matches reachable readiness and
+HTTP 503 matches an unreachable database. Error responses contain only the fixed
+message `Database readiness check failed`; database names, roles, and driver errors
+are not exposed by the endpoint.
 
 ## Consuming it from the browser
 

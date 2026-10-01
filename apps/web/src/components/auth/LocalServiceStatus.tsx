@@ -1,20 +1,15 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchHealth } from '../../api/health';
+import { useSystemHealth } from '../system/useSystemHealth';
 export function LocalServiceStatus() {
-  const health = useQuery({
-    queryKey: ['health'],
-    queryFn: ({ signal }) => fetchHealth(signal),
-    refetchInterval: 5_000,
-    networkMode: 'always',
-    retry: false,
-  });
-  const checking = health.isPending;
+  const health = useSystemHealth();
+  const checking = health.isPending && !health.isError;
   const ready = !checking && !health.isError && health.data?.status === 'ok';
   const label = checking
     ? 'Checking local system'
     : ready
       ? 'Local system ready'
-      : 'Local payroll service unavailable';
+      : !health.isError && health.data?.database === 'unreachable'
+        ? 'Local service running; database unavailable'
+        : 'Local payroll service unavailable';
   return (
     <div role="status" className="flex items-center justify-center gap-2 text-xs text-slate-600">
       <span

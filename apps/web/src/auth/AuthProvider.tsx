@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { LoginResponse } from '@hexpayroll/shared';
 import { revokeSession } from './authentication';
+import { useQueryClient } from '@tanstack/react-query';
 interface AuthContextValue {
   session: LoginResponse | null;
   notice: string | undefined;
@@ -10,12 +11,22 @@ interface AuthContextValue {
 }
 const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<LoginResponse | null>(null);
   const [notice, setNotice] = useState<string>();
-  const clearSession = useCallback((message?: string) => {
-    setSession(null);
-    setNotice(message);
-  }, []);
+  const clearSession = useCallback(
+    (message?: string) => {
+      setSession(null);
+      setNotice(message);
+      const scoped = {
+        predicate: (query: { queryKey: readonly unknown[] }) =>
+          query.queryKey[0] === 'auth-session' || query.queryKey[0] === 'operations',
+      };
+      void queryClient.cancelQueries(scoped);
+      queryClient.removeQueries(scoped);
+    },
+    [queryClient],
+  );
   useEffect(() => {
     if (!session) return;
     const remaining = Date.parse(session.expiresAt) - Date.now();

@@ -94,14 +94,19 @@ The router is mounted at `/api` and registers **`/health`**, so the endpoint the
 call is **`GET /api/health`** — the path `HEALTH_PATH` in `@hexpayroll/shared` declares and
 `apps/web` interpolates into its fetch URL:
 
-| Outcome           | Status | Body                                                                                                                               |
-| ----------------- | ------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| database answered | `200`  | `HealthStatus` with `status: 'ok'`, `database: 'reachable'`, `databaseVersion`, `timestamp`, plus `databaseName` and `connectedAs` |
-| database failed   | `503`  | `HealthStatus` with `status: 'error'`, `database: 'unreachable'`, `timestamp`, `error`                                             |
+| Outcome           | Status | Body                                                                                        |
+| ----------------- | ------ | ------------------------------------------------------------------------------------------- |
+| database answered | `200`  | `HealthStatus` with `status: 'ok'`, `database: 'reachable'`, `databaseVersion`, `timestamp` |
+| database failed   | `503`  | `HealthStatus` with `status: 'error'`, `database: 'unreachable'`, `timestamp`, `error`      |
 
 Because a real query must succeed for a 200, this doubles as a readiness probe rather than a
 liveness no-op. Field-by-field meaning of `HealthStatus` lives in
 [`../packages/shared.md`](../packages/shared.md#healthts--the-phase-0-end-to-end-contract).
+
+Responses use `Cache-Control: no-store`. Probe failures return the fixed safe
+message `Database readiness check failed`. Database names, runtime roles, raw
+exceptions, credentials, and connection strings are not included. The router
+factory accepts an injected probe for isolated readiness and recovery tests.
 
 ## Cross-origin access (`middleware/cors.ts`)
 
