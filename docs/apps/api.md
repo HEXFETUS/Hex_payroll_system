@@ -1,5 +1,10 @@
 # `@hexpayroll/api`
 
+Local authentication routes, explicit migration and account-creation commands, and
+shared HTTP contracts are described in [authentication](../authentication.md).
+Authentication routes are mounted before the general JSON parser so login payloads
+receive their own 8 KiB limit and safe error responses.
+
 The Express 5 + `pg` + Zod + pino HTTP API. Built as one deployable so the **same
 application** runs as the desktop's private local server and as the central server — there is
 no "desktop API" and "cloud API" to keep in sync.

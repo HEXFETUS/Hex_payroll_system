@@ -13,7 +13,8 @@ Two layers, deliberately separated:
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | [`architecture.md`](architecture.md)                       | offline-first topology, one `createApp()` on two hosts, process model and ports, request flow, security boundaries, module boundaries |
 | [`apps/api.md`](apps/api.md)                               | boot sequence, middleware order, environment contract, `pg` pool and probe, health 200/503 contract, loopback-only CORS access        |
-| [`apps/web.md`](apps/web.md)                               | Vite/Tailwind setup, `index.html` CSP, entry point wiring, the Phase 0 health dashboard                                               |
+| [`apps/web.md`](apps/web.md)                               | Vite/Tailwind setup, login UI, memory-only authentication state and protected confirmation page                                       |
+| [`authentication.md`](authentication.md)                   | local authentication contracts, migrations, account creation, sessions, and tests                                                     |
 | [`apps/desktop.md`](apps/desktop.md)                       | Electron main + preload surface, dev-vs-packaged UI loading, single-instance guard, electron-builder config                           |
 | [`packages/shared.md`](packages/shared.md)                 | money as integer centavos, allocation without drift, Zod primitives, `HealthStatus` and `HEALTH_PATH`, NodeNext entry-point rules     |
 | [`packages/payroll-engine.md`](packages/payroll-engine.md) | the pure-library contract, exported types, the `netPay` invariants Phase 2 must test                                                  |

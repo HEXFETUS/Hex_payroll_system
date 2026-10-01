@@ -1,10 +1,16 @@
 @import 'tailwindcss';
 
-/*
- * Phase 0 base styling only.
- * Deliberately minimal: this file exists so Tailwind 4 is proven wired up
- * through @tailwindcss/vite, not to establish a design system yet.
- */
+@layer components {
+  .credential-input {
+    @apply block min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-teal-700 focus:ring-2 focus:ring-teal-700/20 disabled:bg-slate-50 disabled:text-slate-500;
+  }
+  .credential-input[aria-invalid='true'] {
+    @apply border-red-600 focus:ring-red-600/20;
+  }
+  .text-action {
+    @apply rounded-sm font-medium text-teal-700 hover:text-teal-900 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700;
+  }
+}
 
 html,
 body,
@@ -15,6 +21,13 @@ body,
 body {
   margin: 0;
   font-family:
-    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
   -webkit-font-smoothing: antialiased;
 }

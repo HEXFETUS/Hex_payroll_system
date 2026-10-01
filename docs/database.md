@@ -41,7 +41,10 @@ migrations never need hand-written `GRANT`s that somebody will eventually forget
 
 ## Migrations (`database/migrations/`)
 
-Phase 0 contains only `.gitkeep`; `0001`–`0007` arrive in Phase 1. The rules are already fixed:
+`0001_auth.sql` adds local application users and hashed-token sessions. Run
+`pnpm --filter @hexpayroll/api migrate` explicitly using `MIGRATION_DATABASE_URL`.
+See [local authentication](authentication.md) for account creation and tests.
+The rules are:
 
 - `NNNN_name.sql` is the **single authoritative schema history**, plain SQL, numbered and
   applied in lexical order.
