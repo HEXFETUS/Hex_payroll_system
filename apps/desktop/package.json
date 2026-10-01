@@ -5,7 +5,7 @@
   "description": "Electron desktop shell for Hex Payroll. Owns main + preload only; the renderer is apps/web.",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "electron-vite dev",
+    "dev": "electron-vite dev --watch",
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",

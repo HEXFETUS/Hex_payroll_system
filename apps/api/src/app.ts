@@ -2,6 +2,7 @@ import express from 'express';
 import type { ErrorRequestHandler, Express, RequestHandler } from 'express';
 import pino from 'pino';
 import { env } from './config/env.js';
+import { corsMiddleware } from './middleware/cors.js';
 import { healthRouter } from './routes/health.js';
 
 export const logger = pino({ level: env.LOG_LEVEL });
@@ -46,10 +47,15 @@ export function createApp(): Express {
   const app = express();
 
   app.disable('x-powered-by');
+  // Before the body parser: a preflight carries no body, and a rejected origin
+  // must not be able to make the server parse anything.
+  app.use(corsMiddleware);
   app.use(express.json({ limit: '1mb' }));
   app.use(requestLogger);
 
-  app.use(healthRouter);
+  // Mounted under `/api`, which is where every consumer expects health
+  // (`HEALTH_PATH` in @hexpayroll/shared) and where resource routes will live.
+  app.use('/api', healthRouter);
 
   app.use(notFound);
   app.use(errorHandler);

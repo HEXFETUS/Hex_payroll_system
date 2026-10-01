@@ -1,271 +1,45 @@
 # Hex Payroll
 
-Offline-first desktop payroll system for Philippine payroll operations.
+Offline-first desktop payroll system for Philippine payroll operations — Electron + React +
+Express + PostgreSQL 18. A payroll clerk must be able to keep working when the Internet is
+unavailable, and synchronise later.
 
-A payroll clerk must be able to keep working when the Internet is unavailable, and
-synchronise later. That single requirement shapes every decision below.
+**Current phase: Phase 0 — foundation is complete.** The workspace, PostgreSQL roles, the
+Express API, the shared packages and the Electron shell are wired together and proven to
+build. There are deliberately **no payroll tables, no contribution rules and no sync logic
+yet** — those begin in Phase 1.
 
-**Current phase: Phase 0 — foundation.** PostgreSQL, the Express API, the shared
-packages and the Electron shell are wired together and proven to build. There are
-deliberately **no payroll tables, no contribution rules and no sync logic yet.**
+## Documentation
 
----
+| Where                                                | What                                                                                                                  |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| [`docs/index.md`](docs/index.md)                     | Map of the whole documentation set — start here                                                                       |
+| [`docs/README.md`](docs/README.md)                   | Project overview, stack, decision record, first-time setup, scripts, roadmap                                          |
+| [`docs/architecture.md`](docs/architecture.md)       | Topology, process model, request flow, security and module boundaries                                                 |
+| [`docs/apps/`](docs/apps/api.md)                     | [`api`](docs/apps/api.md) · [`web`](docs/apps/web.md) · [`desktop`](docs/apps/desktop.md)                             |
+| [`docs/packages/`](docs/packages/shared.md)          | [`shared`](docs/packages/shared.md) (money, primitives, health) · [`payroll-engine`](docs/packages/payroll-engine.md) |
+| [`docs/database.md`](docs/database.md)               | PostgreSQL 18 roles, provisioning, migration rules                                                                    |
+| [`docs/development.md`](docs/development.md)         | Build graph, toolchain pins, conventions                                                                              |
+| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Failures you will actually hit                                                                                        |
 
-## Architecture
-
-```
-                    HEX PAYROLL
-                         │
-        ┌────────────────┴────────────────┐
-        │                                 │
-     DESKTOP                            SERVER
-        │                                 │
-     Electron                          Express
-        │                                 │
-      React                         PostgreSQL 18
-        │
-      Express
-        │
-   PostgreSQL 18
-        │
-     Outbox
-        │
-   Sync Engine
-        │
-        └──────────── HTTPS ──────────────►
-```
-
-The desktop is **offline-first**: React talks to a **local** Express API backed by a
-**local** PostgreSQL 18 cluster. Nothing on the critical path requires the Internet.
-
-```
-PostgreSQL → migration runner → generated schema.ts → createApp()
-   → Electron child process → React desktop UI
-```
-
-`createApp()` is a single factory mounted by two entrypoints — the desktop's private
-local server and the central server. There is no "desktop API" and "cloud API" to keep
-in sync, only one application with two hosts.
-
-### Stack
-
-| Layer | Choice |
-| --- | --- |
-| Desktop shell | Electron 44 + electron-vite 5 (main + preload only) |
-| UI | React 19 · TypeScript 6 · Vite 7 · Tailwind 4 · React Router 7 · TanStack Query 5 |
-| API | Node 22+ · Express 5 · Zod 4 · pino |
-| Database | PostgreSQL 18 (`uuidv7()`, `numeric(14,2)`) |
-| Access layer | Drizzle ORM (typed queries) + `pg` |
-| Workspace | pnpm workspaces · ESLint 10 · Prettier 3 |
-
----
-
-## Decision record
-
-These are locked and non-obvious. Each one has a reason that is easy to forget later.
-
-1. **PostgreSQL 18 everywhere.** One SQL dialect across dev, desktop and cloud.
-   Packaged installs will spawn a *private* cluster, so no admin install is needed
-   on a client PC.
-2. **`database/migrations/*.sql` is the sole authoritative schema history.**
-   Plain SQL, numbered, committed, immutable once merged.
-3. **`drizzle-kit push` is banned.** On PostgreSQL 18 it emits a destructive
-   `ALTER TABLE ... DROP CONSTRAINT` on re-run (drizzle-kit issue #4944). Migrations
-   are applied by our own runner, never by `push`.
-4. **The migration runner is ours** (`pg`-only), so it runs identically in dev, in the
-   desktop child process and on the central server — and needs no dev tooling at runtime.
-5. **`schema.ts` is machine-owned.** Generated by `drizzle-kit pull`, never hand-edited.
-   Hand-written query metadata lives in a separate `relations.ts`, which carries no DDL
-   and therefore cannot drift.
-6. **UUIDv7 primary keys**, generated natively by PostgreSQL 18. Time-ordered, so a
-   desktop can mint valid keys while offline without index bloat.
-7. **Money is an integer number of centavos.** Never a float. See `packages/shared/src/money.ts`.
-8. **Two database roles.** `hexpayroll_migrator` owns the schema; `hexpayroll_app` is
-   DML-only. The running application cannot alter its own schema.
-9. **Split frontends.** `apps/web` stays Electron-agnostic so a browser build remains
-   possible without reshaping the desktop architecture.
-10. **Up-only migrations.** No `.down.sql`. A rollback that drops payroll columns is a
-    loaded gun; fix forward with a new migration.
-11. **Auto-update is disabled.** Silently changing tax tables mid-period is an incident,
-    not a convenience.
-12. **TypeScript 6.0.3, not 7.x.** `typescript-eslint@8` declares
-    `typescript: ">=4.8.4 <6.1.0"`, so TS 7 is rejected by the toolchain.
-
----
-
-## Repository layout
-
-```
-hexpayrollsys/
-├── apps/
-│   ├── api/          Express + pg + Zod. One createApp(), two entrypoints.
-│   ├── web/          React UI. Electron-agnostic; browser-buildable.
-│   └── desktop/      Electron main + preload only. Renderer is apps/web.
-├── packages/
-│   ├── shared/       Contracts, Zod primitives, money helpers.
-│   └── payroll-engine/  Pure computation core. No I/O. Types only so far.
-├── database/
-│   ├── migrations/   AUTHORITATIVE schema history (empty in Phase 0).
-│   └── provision/    One-time role/database/privilege bootstrap.
-├── eslint.config.mjs
-├── pnpm-workspace.yaml
-├── tsconfig.base.json
-└── README.md
-```
-
----
-
-## Prerequisites
-
-- **Node.js 22.12+** (developed on 24.11)
-- **pnpm 11** (declared via `packageManager`; use `corepack enable`)
-- **PostgreSQL 18** running locally on port 5432
-
----
-
-## First-time setup
-
-### 1. Configure the API environment
+## Quick start
 
 ```powershell
-Copy-Item apps/api/.env.example apps/api/.env
-# then edit apps/api/.env and set real passwords
-```
-
-`apps/api/.env` is gitignored. It holds **two** connection strings on purpose:
-
-| Variable | Role | Used by |
-| --- | --- | --- |
-| `DATABASE_URL` | `hexpayroll_app` | the running Express API — DML only |
-| `MIGRATION_DATABASE_URL` | `hexpayroll_migrator` | the migration runner (Phase 1) — owns the schema |
-
-### 2. Provision the database
-
-Run once, as a PostgreSQL superuser:
-
-```powershell
-$psql = 'C:\Program Files\PostgreSQL\18\bin\psql.exe'
-
-# Creates hexpayroll_migrator, hexpayroll_app and the hexpayroll_dev database.
-& $psql -h 127.0.0.1 -U postgres -d postgres -f database/provision/01_create_roles_and_database.sql
-
-# Grants the app role DML on future tables, while denying it any DDL.
-& $psql -h 127.0.0.1 -U postgres -d hexpayroll_dev -f database/provision/02_grant_app_privileges.sql
-```
-
-Verify the app role genuinely cannot alter the schema (it must error):
-
-```powershell
-& $psql -h 127.0.0.1 -U postgres -d hexpayroll_dev -c "SET ROLE hexpayroll_app; CREATE TABLE must_fail (id int);"
-```
-
-### 3. Install
-
-```powershell
+Copy-Item apps/api/.env.example apps/api/.env   # then set real passwords
 pnpm install
+pnpm dev        # API :4311 + web dev server :5273 + the Electron shell
 ```
 
-> **Two installation details that will otherwise cost you an hour.**
->
-> 1. **Build scripts are blocked by default.** pnpm 10+ refuses to run dependency
->    postinstall scripts. pnpm 11 records the decision as `allowBuilds` in
->    `pnpm-workspace.yaml`. A flagged package with no decision produces
->    `ERR_PNPM_IGNORED_BUILDS`, which fails pnpm's dependency verification before
->    *every* script it runs. Add entries deliberately — never use `--allow-all`.
-> 2. **Electron 44 has no postinstall script.** It ships `install.js` as a bin named
->    `install-electron`, so no allowlist entry downloads its binary. The root
->    `postinstall` script handles it and is idempotent (~0.4 s when the binary is
->    already present). If `electron.exe` is ever missing, run:
->    `pnpm --filter @hexpayroll/desktop exec install-electron`
+`pnpm dev` — run from the repository root — is the whole development stack in one command. The shell
+refuses to open a window until the dev server answers, so a cold start neither flashes a blank window
+nor depends on winning a race against Vite. Closing the window stops all three processes. Inside
+`apps/desktop`, `pnpm dev` means the shell only; that is what `pnpm dev:desktop` does from the root.
 
-### 4. Run
+To run the API and the UI without Electron — the web app stays browser-buildable on purpose:
 
 ```powershell
-pnpm dev            # API on http://127.0.0.1:4311 + web dev server on :5273
-pnpm dev:desktop    # Electron shell (expects the web dev server to be running)
+pnpm dev:browser
 ```
 
----
-
-## Scripts
-
-| Command | What it does |
-| --- | --- |
-| `pnpm install` | Installs everything, then fetches the Electron binary (idempotent) |
-| `pnpm dev` | API on `127.0.0.1:4311` + web dev server on `127.0.0.1:5273` |
-| `pnpm dev:desktop` | Runs the Electron shell against the web dev server |
-| `pnpm build` | Builds every package and app |
-| `pnpm typecheck` | Type-checks every package (builds `packages/*` first) |
-| `pnpm lint` | ESLint 10 across the repository |
-| `pnpm format` | Prettier write |
-
----
-
-## Development rules
-
-### Migrations
-
-- `database/migrations/NNNN_name.sql` is the **single source of truth** for the schema.
-- Numbered, applied in lexical order, **up-only**: fix forward with a new migration
-  rather than editing history.
-- A merged migration is **immutable**. The runner verifies a checksum of every
-  already-applied file and refuses to start if one changed.
-- **`drizzle-kit push` is banned.** On PostgreSQL 18 it emits a destructive
-  `ALTER TABLE ... DROP CONSTRAINT` on re-run (drizzle-kit issue #4944).
-- The runner (`apps/api/src/db/migrate.ts`, Phase 1) connects as
-  `hexpayroll_migrator`. The running API connects as `hexpayroll_app`, which has
-  no DDL privileges at all.
-
-### Generated schema
-
-`schema.ts` is **machine-owned**: regenerate it with `drizzle-kit pull` after every
-migration and commit both together. Never hand-edit it. Hand-written query metadata
-belongs in a separate `relations.ts`, which maps to no DDL and therefore cannot drift
-out of sync with the database.
-
----
-
-## Troubleshooting
-
-### The desktop window crashes with `electron.app` is undefined
-
-`ELECTRON_RUN_AS_NODE` is set in your shell. That variable makes the Electron binary
-behave as plain Node, so `require('electron')` returns a file path instead of the
-Electron API. **VS Code's integrated terminal sets this variable.** Launch from a
-normal terminal, or clear it first:
-
-```powershell
-Remove-Item Env:ELECTRON_RUN_AS_NODE
-```
-
-To confirm which runtime you have, run this from `apps/desktop`:
-
-```powershell
-& node_modules\.bin\electron.cmd --version
-```
-
-It must print an **Electron** version (e.g. `v44.4.5`). If it prints a **Node**
-version (e.g. `v24.x`), `ELECTRON_RUN_AS_NODE` is still set.
-
-### `(!) renderer config is missing` during the desktop build
-
-Expected, and not an error. `electron-vite` is configured for `main` + `preload`
-only, because `apps/web` owns the renderer with its own Vite pipeline. See
-`apps/desktop/electron.vite.config.ts`.
-
-### `ERR_PNPM_IGNORED_BUILDS`
-
-A dependency with a build script has no explicit decision in `allowBuilds`. Add it to
-`pnpm-workspace.yaml` deliberately — see the Install section.
-
----
-
-## Roadmap
-
-| Phase | Scope | Status |
-| --- | --- | --- |
-| **0** | Workspace, API, PostgreSQL, Electron shell, green build | **complete** |
-| **1** | Migrations `0001`–`0007`, migration runner, generated `schema.ts`, `relations.ts`, end-to-end vertical slice | next |
-| **2** | Payroll domain: periods, attendance, earnings, deductions, and SSS / PhilHealth / Pag-IBIG / BIR as versioned reference data with effectivity dates | planned |
-| **3** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling | planned |
-| **4** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups | planned |
+Prerequisites (Node 22.12+, pnpm 11, PostgreSQL 18), database provisioning and every script are
+documented in [`docs/README.md`](docs/README.md#first-time-setup).

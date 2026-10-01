@@ -1,4 +1,5 @@
 import { app, BrowserWindow, shell } from 'electron';
+import { get } from 'node:http';
 import { join } from 'node:path';
 
 /**
@@ -15,15 +16,124 @@ import { join } from 'node:path';
 /** Where apps/web's dev server listens (see apps/web/vite.config.ts). */
 const DEV_WEB_URL = process.env.HEX_WEB_DEV_URL ?? 'http://127.0.0.1:5273';
 
+/** Reads a non-negative integer from the environment, falling back when unset or junk. */
+function readNonNegativeInt(value: string | undefined, fallback: number): number {
+  const parsed = Number.parseInt(value ?? '', 10);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
+}
+
+/**
+ * How long the shell waits for apps/web's dev server before giving up.
+ *
+ * Deliberately generous: this happens once per `pnpm dev`, and a cold Vite start on a
+ * slow disk is seconds, not minutes. `HEX_WEB_WAIT_TIMEOUT_MS` overrides it, and `0`
+ * means "do not gate the window at all" — the pre-wait behaviour of loading first and
+ * letting the late-load retry below sort it out.
+ */
+const DEV_WAIT_TIMEOUT_MS = readNonNegativeInt(process.env.HEX_WEB_WAIT_TIMEOUT_MS, 60_000);
+const DEV_WAIT_INTERVAL_MS = 250;
+const DEV_WAIT_REQUEST_TIMEOUT_MS = 1_000;
+
+/** How often the wait says it is still waiting, so a slow start does not look like a hang. */
+const DEV_WAIT_HEARTBEAT_MS = 5_000;
+
+/** The late-load retry: now a fallback for a dev server that died and came back. */
 const DEV_SERVER_MAX_ATTEMPTS = 20;
 const DEV_SERVER_RETRY_MS = 500;
 
 let mainWindow: BrowserWindow | null = null;
 
 /**
+ * One readiness probe.
+ *
+ * Resolves with `null` once something answers, or a short reason — the socket error
+ * code — when nothing does. Carrying the reason matters: `ECONNREFUSED` means nothing
+ * is listening on that port, while `ETIMEDOUT` means something is listening and stuck,
+ * and those two point at completely different fixes.
+ *
+ * Any answer counts, 404 included: the question is whether something is serving HTTP
+ * on that address, not whether the route exists. A refused connection fails
+ * immediately, so polling is cheap; `timeout` only bounds a hung socket.
+ */
+function probeDevServer(url: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    const request = get(url, { timeout: DEV_WAIT_REQUEST_TIMEOUT_MS }, (response) => {
+      response.resume(); // Drain the body; only "the server answered" matters.
+      resolve(null);
+    });
+
+    request.on('timeout', () => request.destroy());
+    request.on('error', (error: NodeJS.ErrnoException) => resolve(error.code ?? error.message));
+  });
+}
+
+/**
+ * Blocks until apps/web's dev server answers.
+ *
+ * `pnpm dev` starts Vite, the API and this shell at the same time, so the shell
+ * routinely wins the race. Waiting here means no window exists until there is
+ * something to render. Loading a refused URL instead paints Chromium's error page
+ * behind `show: false` and then flashes it on `ready-to-show`.
+ *
+ * Development only: a packaged shell loads the built UI from disk.
+ */
+async function waitForDevServer(url: string): Promise<void> {
+  const startedAt = Date.now();
+  const deadline = startedAt + DEV_WAIT_TIMEOUT_MS;
+  let announced = false;
+  let lastHeartbeat = startedAt;
+  let lastReason = 'no answer yet';
+
+  while (Date.now() < deadline) {
+    const reason = await probeDevServer(url);
+
+    if (reason === null) {
+      if (announced) {
+        console.log(`[desktop] web dev server ready after ${Date.now() - startedAt} ms`);
+      }
+      return;
+    }
+
+    lastReason = reason;
+
+    if (!announced) {
+      console.log(`[desktop] waiting for the web dev server at ${url} ...`);
+      announced = true;
+    }
+
+    if (Date.now() - lastHeartbeat >= DEV_WAIT_HEARTBEAT_MS) {
+      const waitedSeconds = Math.round((Date.now() - startedAt) / 1_000);
+      console.log(
+        `[desktop] still waiting for ${url} (${waitedSeconds}s, last error: ${lastReason})`,
+      );
+      lastHeartbeat = Date.now();
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, DEV_WAIT_INTERVAL_MS));
+  }
+
+  // The overwhelmingly likely cause is `pnpm dev` run from apps/desktop, where that
+  // script starts this shell and nothing else. Saying so beats making a developer
+  // guess at a port number.
+  console.error(
+    `[desktop] no web dev server answered at ${url} within ${DEV_WAIT_TIMEOUT_MS} ms ` +
+      `(last error: ${lastReason}).\n` +
+      '[desktop] Run `pnpm dev` from the repository root: it starts the API, the web dev\n' +
+      '[desktop] server and this shell together. Inside apps/desktop, `pnpm dev` (and\n' +
+      '[desktop] `pnpm dev:desktop` from the root) starts this shell alone.\n' +
+      '[desktop] See docs/troubleshooting.md.',
+  );
+
+  throw new Error(`no web dev server answered at ${url} (${lastReason})`);
+}
+
+/**
  * Loads the UI, tolerating the fact that in development the Vite dev server may
  * not have finished starting. Without this, launching the desktop a moment too
  * early shows a blank window instead of waiting for the UI.
+ *
+ * `waitForDevServer()` above makes this the fallback rather than the mechanism:
+ * it matters when the dev server dies and comes back while the window is open.
  */
 async function loadDevServer(window: BrowserWindow, attempt = 1): Promise<void> {
   try {
@@ -109,8 +219,17 @@ if (!hasSingleInstanceLock) {
 
   app
     .whenReady()
-    .then(() => {
+    .then(async () => {
       app.setAppUserModelId('ph.hexpayroll.desktop');
+
+      // Development only: a packaged shell loads the built UI from disk, so there is
+      // nothing to wait for. `HEX_WEB_WAIT_TIMEOUT_MS=0` opts out of the gate. A timeout
+      // rejects into the catch below and quits, which is far more legible than an open
+      // window with nothing in it.
+      if (!app.isPackaged && DEV_WAIT_TIMEOUT_MS > 0) {
+        await waitForDevServer(DEV_WEB_URL);
+      }
+
       createWindow();
 
       app.on('activate', () => {
@@ -121,7 +240,10 @@ if (!hasSingleInstanceLock) {
     })
     .catch((error: unknown) => {
       console.error('[desktop] failed to start:', error);
-      app.quit();
+      // Non-zero on purpose: `pnpm dev` runs concurrently with `--success first`, so the
+      // first process to exit decides the result. A shell that could not start must not
+      // look like a clean shutdown just because it quit deliberately.
+      app.exit(1);
     });
 
   app.on('window-all-closed', () => {

@@ -10,9 +10,17 @@ interface HealthPayload extends HealthStatus {
 }
 
 async function fetchHealth(): Promise<HealthPayload> {
-  const response = await fetch(`${API_BASE_URL}${HEALTH_PATH}`, {
-    headers: { accept: 'application/json' },
-  });
+  const url = `${API_BASE_URL}${HEALTH_PATH}`;
+
+  // `fetch` rejects only when no readable response arrived at all: nothing is
+  // listening, or CORS refused it. Chromium reports that as a bare "Failed to
+  // fetch", which names neither the cause nor the address, so name the URL that
+  // could not be reached and keep the original error as `cause`.
+  const response = await fetch(url, { headers: { accept: 'application/json' } }).catch(
+    (error: unknown): never => {
+      throw new Error(`cannot reach ${url}`, { cause: error });
+    },
+  );
 
   const payload = (await response.json()) as HealthPayload;
 
@@ -66,15 +74,18 @@ export default function App() {
   const pending = health.isLoading;
   const failure = health.error instanceof Error ? health.error.message : undefined;
 
+  // `undefined` means no payload ever arrived, which is not the same as the API
+  // reporting the database unreachable — only a 503 whose body says so proves
+  // that. The two must not render as the same red row.
+  const database = health.data?.database;
+
   return (
     <div className="min-h-full bg-slate-950 p-6 text-slate-100">
       <div className="mx-auto max-w-3xl">
         <header className="mb-6 flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Hex Payroll</h1>
-            <p className="mt-1 text-sm text-slate-400">
-              Phase 0 — desktop foundation verification
-            </p>
+            <p className="mt-1 text-sm text-slate-400">Phase 0 — desktop foundation verification</p>
           </div>
           <StatusPill online={online} pending={pending} />
         </header>
@@ -92,8 +103,8 @@ export default function App() {
           />
           <CheckRow
             label="Database"
-            value={health.data?.database ?? (pending ? 'checking…' : 'unreachable')}
-            ok={pending ? undefined : health.data?.database === 'reachable'}
+            value={pending ? 'checking…' : (database ?? 'unknown')}
+            ok={database === undefined ? undefined : database === 'reachable'}
           />
           <CheckRow label="Database name" value={health.data?.databaseName ?? '—'} />
           <CheckRow label="Connected as" value={health.data?.connectedAs ?? '—'} />
