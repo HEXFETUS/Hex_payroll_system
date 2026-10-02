@@ -5,9 +5,9 @@ Offline-first desktop payroll system for Philippine payroll operations.
 A payroll clerk must be able to keep working when the Internet is unavailable, and
 synchronise later. That single requirement shapes every decision below.
 
-**Current phase: Phase 0 — foundation.** PostgreSQL, the Express API, the shared
-packages and the Electron shell are wired together and proven to build. There are
-deliberately **no payroll tables, no contribution rules and no sync logic yet.**
+**Current phase: Phase 1 — core foundation.** Persisted company/workforce data,
+employment history, RBAC, configuration, audit, and atomic outbox tracking are connected.
+Payroll computation and full sync remain deferred. See [Phase 1](phase1-foundation.md).
 
 > **Code reference:** the per-app and per-package documentation set starts at
 > [`docs/index.md`](index.md). This file stays the project, decision and setup overview.
@@ -57,7 +57,7 @@ in sync, only one application with two hosts.
 | Desktop shell | Electron 44 + electron-vite 5 (main + preload only)                               |
 | UI            | React 19 · TypeScript 6 · Vite 7 · Tailwind 4 · React Router 7 · TanStack Query 5 |
 | API           | Node 22+ · Express 5 · Zod 4 · pino                                               |
-| Database      | PostgreSQL 18 (`uuidv7()`, `numeric(14,2)`)                                       |
+| Database      | PostgreSQL 18 (`uuidv7()`, `bigint` integer centavos)                             |
 | Access layer  | Drizzle ORM (typed queries) + `pg`                                                |
 | Workspace     | pnpm workspaces · ESLint 10 · Prettier 3                                          |
 
@@ -108,7 +108,7 @@ hexpayrollsys/
 │   ├── shared/       Contracts, Zod primitives, money helpers.
 │   └── payroll-engine/  Pure computation core. No I/O. Types only so far.
 ├── database/
-│   ├── migrations/   AUTHORITATIVE schema history (empty in Phase 0).
+│   ├── migrations/   AUTHORITATIVE immutable SQL schema history.
 │   └── provision/    One-time role/database/privilege bootstrap.
 ├── docs/             Documentation set; start at docs/index.md
 ├── eslint.config.mjs
@@ -272,10 +272,10 @@ A dependency with a build script has no explicit decision in `allowBuilds`. Add 
 
 ## Roadmap
 
-| Phase | Scope                                                                                                                                               | Status       |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
-| **0** | Workspace, API, PostgreSQL, Electron shell, green build                                                                                             | **complete** |
-| **1** | Migrations `0001`–`0007`, migration runner, generated `schema.ts`, `relations.ts`, end-to-end vertical slice                                        | next         |
-| **2** | Payroll domain: periods, attendance, earnings, deductions, and SSS / PhilHealth / Pag-IBIG / BIR as versioned reference data with effectivity dates | planned      |
-| **3** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                                                            | planned      |
-| **4** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups                                                      | planned      |
+| Phase | Scope                                                                                                                                               | Status                                      |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| **0** | Workspace, API, PostgreSQL, Electron shell, green build                                                                                             | **complete**                                |
+| **1** | Organization, RBAC, workforce/employment history, configuration, audit, outbox, generated schema and UI                                             | implemented; verification in Phase 1 report |
+| **2** | Payroll domain: periods, attendance, earnings, deductions, and SSS / PhilHealth / Pag-IBIG / BIR as versioned reference data with effectivity dates | planned                                     |
+| **3** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                                                            | planned                                     |
+| **4** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups                                                      | planned                                     |

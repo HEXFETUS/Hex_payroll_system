@@ -1,4 +1,5 @@
 import pg from 'pg';
+import './types.js';
 import { env } from '../config/env.js';
 
 /**

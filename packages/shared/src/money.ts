@@ -6,8 +6,8 @@
  * database. Binary floating point cannot represent decimal money exactly
  * (0.1 + 0.2 !== 0.3), and in payroll those errors compound across earnings,
  * deductions, contributions and withholding tax until payslips fail to
- * reconcile. PostgreSQL holds these values as `numeric(14,2)`; JavaScript holds
- * them as integers of centavos; conversion happens only at the edges via
+ * reconcile. PostgreSQL holds these values as integer centavos in `bigint`;
+ * JavaScript holds safe integers of centavos; decimal display/input conversion happens via
  * `centavosToDecimalString` / `decimalStringToCentavos`.
  */
 
@@ -135,8 +135,8 @@ export function formatPeso(centavos: Centavos, locale = 'en-PH'): string {
 
 /**
  * Renders centavos as a fixed-scale decimal string safe for a PostgreSQL
- * `numeric(14,2)` parameter, e.g. 123456 -> "1234.56", -5 -> "-0.05".
- * Built with integer arithmetic so no float ever touches a numeric column.
+ * decimal display/input string, e.g. 123456 -> "1234.56", -5 -> "-0.05".
+ * Built with integer arithmetic; centavo database parameters remain integers.
  */
 export function centavosToDecimalString(centavos: Centavos): string {
   assertCentavos(centavos, 'centavos');
@@ -148,8 +148,7 @@ export function centavosToDecimalString(centavos: Centavos): string {
 }
 
 /**
- * Parses a PostgreSQL `numeric(14,2)` value (returned as a string by
- * node-postgres) into centavos.
+ * Parses a decimal peso input string into integer centavos.
  */
 export function decimalStringToCentavos(value: string): Centavos {
   const match = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(value.trim());

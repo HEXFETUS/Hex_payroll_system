@@ -24,6 +24,9 @@ Two layers, deliberately separated:
 
 ## Start here
 
+See [Phase 1 foundation](phase1-foundation.md) for current setup, API routes, permissions,
+employment history, auditing, and offline boundaries.
+
 | I want to…                         | Read                                                                      |
 | ---------------------------------- | ------------------------------------------------------------------------- |
 | run the stack for the first time   | [`README.md` § First-time setup](README.md#first-time-setup)              |

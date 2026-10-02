@@ -6,12 +6,14 @@ import { DataState } from '../components/DataState';
 import { MetricCard } from '../components/dashboard/MetricCard';
 import { AttendanceTable } from '../components/attendance/AttendanceTable';
 import { SystemHealthWidget } from '../components/system/SystemHealth';
+import { useAuth } from '../auth/AuthProvider';
 
 export function DashboardPage() {
+  const { session } = useAuth();
   const date = philippineDate();
   const summary = useQuery({
     queryKey: ['operations', 'dashboard'],
-    queryFn: readDashboardSummary,
+    queryFn: () => readDashboardSummary(session!.accessToken),
     networkMode: 'always',
   });
   const attendance = useQuery({
@@ -29,9 +31,9 @@ export function DashboardPage() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Total Employees" value={values?.totalEmployees} />
-        <MetricCard label="Present Today" value={values?.present} />
-        <MetricCard label="Absent Today" value={values?.absent} />
-        <MetricCard label="Late Today" value={values?.late} />
+        <MetricCard label="Active Employees" value={values?.activeEmployees} />
+        <MetricCard label="Departments" value={values?.departments} />
+        <MetricCard label="Attendance Today" value={undefined} />
       </div>
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-5">
@@ -43,20 +45,10 @@ export function DashboardPage() {
               result={summary.data}
               retry={() => void summary.refetch()}
             >
-              {(data) => (
-                <dl className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-                  {[
-                    ['Present', data.present],
-                    ['Late', data.late],
-                    ['Absent', data.absent],
-                    ['On Leave', data.onLeave],
-                  ].map(([label, value]) => (
-                    <div key={label}>
-                      <dt className="text-sm text-slate-600">{label}</dt>
-                      <dd className="mt-2 text-xl font-semibold">{value}</dd>
-                    </div>
-                  ))}
-                </dl>
+              {() => (
+                <p className="notice">
+                  Attendance ingestion is not implemented. No attendance figures are available.
+                </p>
               )}
             </DataState>
           </section>

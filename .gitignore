@@ -29,3 +29,9 @@ Thumbs.db
 coverage/
 .vite/
 .eslintcache
+# Introspection byproducts are not authoritative migrations.
+apps/api/src/db/generated/*.sql
+apps/api/src/db/generated/meta/
+apps/api/src/db/generated/relations.ts
+apps/web/test-results/
+apps/web/playwright-report/

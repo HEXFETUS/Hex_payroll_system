@@ -2,8 +2,23 @@ import { Link } from 'react-router-dom';
 import { useNetworkConnection, useSystemHealth } from './useSystemHealth';
 import { StatusIndicator, type StatusTone } from './StatusIndicator';
 import { formatTime } from '../../utils/dates';
+import { useQuery } from '@tanstack/react-query';
+import { syncSummarySchema } from '@hexpayroll/shared';
+import { useAuth } from '../../auth/AuthProvider';
+import { foundationRequest } from '../../api/foundation';
 
 export function useHealthItems() {
+  const { session } = useAuth();
+  const sync = useQuery({
+    queryKey: ['operations', 'sync'],
+    queryFn: async () =>
+      syncSummarySchema.parse(await foundationRequest('sync/summary', session!.accessToken)),
+    enabled: Boolean(
+      session?.user.organizationId && session.user.permissions?.includes('sync.view'),
+    ),
+    networkMode: 'always',
+    refetchInterval: 15000,
+  });
   const health = useSystemHealth();
   const online = useNetworkConnection();
   const data = health.isError ? undefined : health.data;
@@ -51,9 +66,9 @@ export function useHealthItems() {
     },
     {
       name: 'Synchronization',
-      label: 'Not implemented',
+      label: sync.data ? `${sync.data.pending} pending` : 'Not configured',
       tone: 'not-configured',
-      detail: 'Synchronization integration is planned for a later phase.',
+      detail: 'Local changes are tracked in a durable outbox. The sync engine is not configured.',
     },
   ];
   return { health, items, data };

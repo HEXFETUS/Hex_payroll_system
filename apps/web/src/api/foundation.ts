@@ -1,0 +1,40 @@
+import {
+  foundationErrorSchema,
+  pageResultSchema,
+  foundationRecordSchema,
+  type FoundationRecord,
+  type PageResult,
+} from '@hexpayroll/shared';
+import { API_BASE_URL } from './health';
+export async function foundationRequest(
+  path: string,
+  token: string,
+  method = 'GET',
+  body?: unknown,
+): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/api/${path}`, {
+    method,
+    headers: {
+      accept: 'application/json',
+      authorization: `Bearer ${token}`,
+      ...(body === undefined ? {} : { 'content-type': 'application/json' }),
+    },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    signal: AbortSignal.timeout(10000),
+    cache: 'no-store',
+    credentials: 'omit',
+  });
+  const payload: unknown = response.status === 204 ? null : await response.json();
+  if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event('hex-session-invalid'));
+    const error = foundationErrorSchema.safeParse(payload);
+    throw new Error(error.success ? error.data.error.message : 'Local service request failed');
+  }
+  return payload;
+}
+export async function readPage(path: string, token: string): Promise<PageResult> {
+  return pageResultSchema.parse(await foundationRequest(path, token));
+}
+export async function readRecord(path: string, token: string): Promise<FoundationRecord> {
+  return foundationRecordSchema.parse(await foundationRequest(path, token));
+}

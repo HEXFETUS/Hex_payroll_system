@@ -7,6 +7,7 @@ import { healthRouter } from './routes/health.js';
 import { createAuthRouter } from './routes/auth.js';
 import { createAuthService } from './auth/service.js';
 import { pool } from './db/pool.js';
+import { createFoundationRouter } from './foundation/router.js';
 
 export const logger = pino({ level: env.LOG_LEVEL });
 
@@ -29,12 +30,33 @@ const requestLogger: RequestHandler = (req, res, next) => {
 };
 
 const notFound: RequestHandler = (_req, res) => {
-  res.status(404).json({ status: 'error', message: 'Not found' });
+  res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Not found' } });
 };
 
 const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
-  logger.error({ err: error }, 'unhandled error');
-  res.status(500).json({ status: 'error', message: 'Internal server error' });
+  logger.error({ errorType: error instanceof Error ? error.name : 'unknown' }, 'unhandled error');
+  const invalid =
+    typeof error === 'object' &&
+    error !== null &&
+    'type' in error &&
+    error.type === 'entity.parse.failed';
+  const large =
+    typeof error === 'object' &&
+    error !== null &&
+    'type' in error &&
+    error.type === 'entity.too.large';
+  res
+    .status(invalid ? 400 : large ? 413 : 500)
+    .json({
+      error: {
+        code: invalid || large ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
+        message: invalid
+          ? 'Malformed JSON'
+          : large
+            ? 'Request is too large'
+            : 'Internal server error',
+      },
+    });
 };
 
 /**
@@ -60,6 +82,7 @@ export function createApp(): Express {
   // Mounted under `/api`, which is where every consumer expects health
   // (`HEALTH_PATH` in @hexpayroll/shared) and where resource routes will live.
   app.use('/api', healthRouter);
+  app.use('/api', createFoundationRouter(pool));
 
   app.use(notFound);
   app.use(errorHandler);

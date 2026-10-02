@@ -1,35 +1,22 @@
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import pg from 'pg';
 import express from 'express';
-import { migrate, readMigrations, migrationChecksum } from '../src/db/migrate.js';
+import { migrate, migrationChecksum } from '../src/db/migrate.js';
+import { databaseFixture, databaseTestsEnabled } from './database-fixture.js';
 import { createAuthService, tokenHash } from '../src/auth/service.js';
 import { createAuthRouter } from '../src/routes/auth.js';
 import { loginResponseSchema, SESSION_LIFETIME_MS } from '@hexpayroll/shared';
 import { corsMiddleware } from '../src/middleware/cors.js';
-const runtimeUrl = process.env.TEST_DATABASE_URL;
-const migrationUrl = process.env.TEST_MIGRATION_DATABASE_URL;
 test(
   'PostgreSQL migrations and local authentication end to end',
-  { skip: !runtimeUrl || !migrationUrl },
+  { skip: !databaseTestsEnabled },
   async () => {
-    for (const connection of [runtimeUrl!, migrationUrl!]) {
-      const name = new URL(connection).pathname.slice(1);
-      assert.match(
-        name,
-        /^hexpayroll_auth_test_[a-z0-9_]+$/,
-        'Tests require a dedicated test database',
-      );
-    }
-    const migrator = new pg.Pool({ connectionString: migrationUrl, connectionTimeoutMillis: 5000 });
-    const runtime = new pg.Pool({ connectionString: runtimeUrl, connectionTimeoutMillis: 5000 });
+    const fixture = await databaseFixture();
+    const { migrator, runtime, migrations } = fixture;
+    const nextNumber = String(Number(migrations.at(-1)!.name.split('_')[0]) + 1).padStart(4, '0');
     try {
-      const migrations = await readMigrations(
-        fileURLToPath(new URL('../../../database/migrations/', import.meta.url)),
-      );
-      assert.equal((await migrate(migrator, migrations)).length, 1);
+      assert.equal((await migrate(migrator, migrations)).length, migrations.length);
       assert.deepEqual(await migrate(migrator, migrations), []);
       const changed = migrations.map((item) => ({
         ...item,
@@ -140,7 +127,11 @@ test(
       await assert.rejects(() =>
         migrate(migrator, [
           ...migrations,
-          { name: '0002_rollback.sql', sql: rollbackSql, checksum: migrationChecksum(rollbackSql) },
+          {
+            name: `${nextNumber}_rollback.sql`,
+            sql: rollbackSql,
+            checksum: migrationChecksum(rollbackSql),
+          },
         ]),
       );
       assert.equal(
@@ -152,7 +143,7 @@ test(
       const concurrent = [
         ...migrations,
         {
-          name: '0002_concurrent.sql',
+          name: `${nextNumber}_concurrent.sql`,
           sql: concurrentSql,
           checksum: migrationChecksum(concurrentSql),
         },
@@ -163,8 +154,7 @@ test(
       ]);
       assert.equal(results.flat().length, 1);
     } finally {
-      await runtime.end();
-      await migrator.end();
+      await fixture.close();
     }
   },
 );

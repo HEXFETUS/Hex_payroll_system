@@ -1,11 +1,13 @@
-import type { ManagedUser } from '../../api/operations';
+import type { ManagedUser } from '@hexpayroll/shared';
 import { StatusIndicator } from '../system/StatusIndicator';
 export function UsersTable({
   users,
   emptyMessage = 'No users found.',
+  onEdit,
 }: {
   users: ManagedUser[];
   emptyMessage?: string;
+  onEdit?: (user: ManagedUser) => void;
 }) {
   return (
     <div className="overflow-x-auto">
@@ -26,23 +28,29 @@ export function UsersTable({
               <tr key={user.id}>
                 <td>{user.displayName}</td>
                 <td>{user.username}</td>
-                <td>{user.role ?? 'Not defined'}</td>
+                <td>{user.roles.join(', ')}</td>
                 <td>
                   <StatusIndicator tone={user.active ? 'healthy' : 'offline'}>
                     {user.active ? 'Active' : 'Inactive'}
                   </StatusIndicator>
                 </td>
                 <td>
-                  {user.lastLogin
+                  {user.lastLoginAt
                     ? new Intl.DateTimeFormat('en-PH', {
                         timeZone: 'Asia/Manila',
                         dateStyle: 'medium',
                         timeStyle: 'short',
-                      }).format(new Date(user.lastLogin))
+                      }).format(new Date(user.lastLoginAt))
                     : '—'}
                 </td>
                 <td>
-                  <span className="text-xs text-slate-500">Not available</span>
+                  {onEdit ? (
+                    <button className="text-action" onClick={() => onEdit(user)}>
+                      Edit
+                    </button>
+                  ) : (
+                    <span className="text-xs text-slate-500">Read only</span>
+                  )}
                 </td>
               </tr>
             ))

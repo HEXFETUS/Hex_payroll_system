@@ -60,7 +60,7 @@ The rules are:
 
 ## Generated schema
 
-`schema.ts` is **machine-owned**: regenerate it with `drizzle-kit pull` after every migration
+`schema.ts` is **machine-owned**: regenerate it with `pnpm --filter @hexpayroll/api schema:pull` after every migration
 and commit both together. Never hand-edit it. Hand-written query metadata lives in a separate
 `relations.ts`, which maps to no DDL and therefore cannot drift out of sync with the database.
 
@@ -68,6 +68,6 @@ and commit both together. Never hand-edit it. Hand-written query metadata lives 
 
 | Convention                                                                                                                            | Where                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Money is `numeric(14,2)`, never a float; JavaScript holds integer **centavos**                                                        | [`packages/shared.md`](packages/shared.md#moneyts--money-is-an-integer-number-of-centavos) |
+| Money is `bigint` integer **centavos**, constrained to JavaScript safe-integer bounds; never a float | [`packages/shared.md`](packages/shared.md#moneyts--money-is-an-integer-number-of-centavos) |
 | Primary keys are UUIDv7 (`uuidv7()`, PostgreSQL 18): time-ordered, so a desktop can mint valid keys while offline without index bloat | Phase 1 migrations                                                                         |
 | Trigger functions (e.g. `hex_touch()`) are created by the migrator and are executable by the app role through default privileges      | `02_grant_app_privileges.sql`                                                              |

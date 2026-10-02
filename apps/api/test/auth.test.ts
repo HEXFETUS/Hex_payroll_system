@@ -77,7 +77,13 @@ test('router returns safe errors, no-store, bounded payloads, and idempotent log
     logout: async () => undefined,
   };
   const app = express();
-  app.use('/api/auth', createAuthRouter(service));
+  app.use(
+    '/api/auth',
+    createAuthRouter(
+      service,
+      createLoginLimiter(() => 0),
+    ),
+  );
   const server = app.listen(0, '127.0.0.1');
   await once(server, 'listening');
   const address = server.address();

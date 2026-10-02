@@ -7,11 +7,10 @@ export function createHealthRouter(probe: () => Promise<DatabaseProbe> = probeDa
   router.get('/health', async (_req, res) => {
     res.setHeader('Cache-Control', 'no-store');
     try {
-      const result = await probe();
+      await probe();
       const body: HealthStatus = {
         status: 'ok',
         database: 'reachable',
-        databaseVersion: result.version,
         timestamp: new Date().toISOString(),
       };
       res.status(200).json(body);

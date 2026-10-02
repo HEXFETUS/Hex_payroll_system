@@ -26,7 +26,7 @@ the specifier to name the file **as it will exist after compilation**. TypeScrip
 ## `money.ts` — money is an integer number of centavos
 
 **Rule: every monetary value in this system is an integer number of centavos.** Floats are
-never stored, summed or sent to PostgreSQL (`numeric(14,2)`). Binary floating point cannot
+never stored, summed or sent to PostgreSQL (`bigint` centavos). Binary floating point cannot
 represent decimal money exactly (`0.1 + 0.2 !== 0.3`), and in payroll those errors compound
 across earnings, deductions, contributions and withholding tax until payslips stop
 reconciling.
@@ -43,8 +43,8 @@ reconciling.
 | `subtractCentavos(a, b)`, `multiplyCentavos(c, factor)` | `multiplyCentavos` rounds to the centavo                                                                                         |
 | `allocateCentavos(total, weights)`                      | largest-remainder split where the parts sum **exactly** to `total`, ties broken by index (deterministic), sign preserved         |
 | `formatPeso(centavos, locale = 'en-PH')`                | `Intl.NumberFormat` currency string, e.g. `123456` → `₱1,234.56`                                                                 |
-| `centavosToDecimalString(centavos)`                     | fixed-scale string for a `numeric(14,2)` parameter, e.g. `123456` → `"1234.56"`, `-5` → `"-0.05"`; built with integer arithmetic |
-| `decimalStringToCentavos(value)`                        | parses the decimal string node-postgres returns for `numeric`                                                                    |
+| `centavosToDecimalString(centavos)`                     | exact decimal peso string for display/forms, e.g. `123456` → `"1234.56"`; not a centavo database parameter |
+| `decimalStringToCentavos(value)`                        | parses decimal peso form input into integer centavos |
 
 `allocateCentavos` exists because naive per-part rounding silently loses or invents centavos.
 Use it whenever a total is divided — a pay-run pot across days worked, a contribution across

@@ -5,6 +5,8 @@ import { readSession, SessionInvalidError } from '../auth/authentication';
 import { useAuth } from '../auth/AuthProvider';
 import { useHealthItems } from '../components/system/SystemHealth';
 import { StatusIndicator } from '../components/system/StatusIndicator';
+import { OrganizationPage } from '../pages/FoundationPages';
+import { settingsNavigation } from '../pages/SettingsPage';
 
 const navigation = [
   {
@@ -14,7 +16,13 @@ const navigation = [
     icon: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
   },
   {
-    group: 'Payroll',
+    group: 'Workforce',
+    title: 'Employees',
+    path: '/employees',
+    icon: 'M5 5h14v16H5z M8 10h8 M8 14h8',
+  },
+  {
+    group: 'Workforce',
     title: 'Employee Attendance',
     path: '/attendance',
     icon: 'M5 5h14v16H5z M8 3v4 M16 3v4 M5 10h14 M8 14h3 M8 17h7',
@@ -26,6 +34,12 @@ const navigation = [
     icon: 'M3 12h4l3-7 4 14 3-7h4',
   },
   {
+    group: 'System',
+    title: 'Sync Status',
+    path: '/sync-status',
+    icon: 'M4 12a8 8 0 0 1 14-5 M20 12a8 8 0 0 1-14 5',
+  },
+  {
     group: 'Administration',
     title: 'Settings',
     path: '/settings',
@@ -33,7 +47,7 @@ const navigation = [
   },
 ];
 export function AppLayout() {
-  const { session, clearSession, signOut } = useAuth();
+  const { session, clearSession, signOut, acceptSession } = useAuth();
   const location = useLocation();
   const [menuOpen, setMenuOpen] = useState(false);
   const verification = useQuery({
@@ -49,6 +63,14 @@ export function AppLayout() {
   const { items } = useHealthItems();
   useEffect(() => {
     if (
+      verification.data &&
+      session &&
+      JSON.stringify(verification.data.user) !== JSON.stringify(session.user)
+    )
+      acceptSession({ ...session, user: verification.data.user });
+  }, [verification.data, session, acceptSession]);
+  useEffect(() => {
+    if (
       verification.error instanceof SessionInvalidError ||
       (verification.data && Date.parse(verification.data.expiresAt) <= Date.now())
     )
@@ -58,7 +80,26 @@ export function AppLayout() {
   const title =
     location.pathname === '/settings/users'
       ? 'User Management'
-      : (navigation.find((item) => item.path === location.pathname)?.title ?? 'Dashboard');
+      : (settingsNavigation.find((item) => item.path === location.pathname)?.title ??
+        navigation.find((item) => item.path === location.pathname)?.title ??
+        (location.pathname.startsWith('/employees/') ? 'Employee Profile' : 'Dashboard'));
+  const permissions: readonly string[] =
+    verification.data?.user.permissions ?? session.user.permissions ?? [];
+  const routePermissions: Record<string, string> = {
+    '/dashboard': 'dashboard.view',
+    '/employees': 'employees.view',
+    '/attendance': 'attendance.view',
+    '/system-health': 'system_health.view',
+    '/sync-status': 'sync.view',
+  };
+  const navigationGroups = new Map<string, typeof navigation>();
+  for (const item of navigation) {
+    if (item.path !== '/settings' && !permissions.includes(routePermissions[item.path] ?? ''))
+      continue;
+    const group = navigationGroups.get(item.group) ?? [];
+    group.push(item);
+    navigationGroups.set(item.group, group);
+  }
   return (
     <div className="flex min-h-full flex-col bg-slate-100 text-slate-900">
       <a
@@ -109,42 +150,53 @@ export function AppLayout() {
             aria-label="Main navigation"
             className={`${menuOpen ? 'block' : 'hidden'} space-y-5 p-4 md:block`}
           >
-            {navigation.map((item) => (
-              <div key={item.path}>
+            {Array.from(navigationGroups, ([group, links]) => (
+              <div key={group}>
                 <p className="mb-2 px-3 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
-                  {item.group}
+                  {group}
                 </p>
-                <NavLink
-                  to={item.path}
-                  onClick={() => setMenuOpen(false)}
-                  className={({ isActive }) =>
-                    `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${isActive ? 'bg-teal-50 text-teal-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`
-                  }
-                >
-                  <svg
-                    aria-hidden="true"
-                    className="h-5 w-5 shrink-0"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d={item.icon} />
-                  </svg>
-                  {item.title}
-                </NavLink>
-                {item.path === '/settings' && location.pathname.startsWith('/settings') && (
-                  <NavLink
-                    to="/settings/users"
-                    className={({ isActive }) =>
-                      `mt-1 ml-8 block rounded-md px-3 py-2 text-sm ${isActive ? 'bg-teal-50 font-medium text-teal-800' : 'text-slate-600'}`
-                    }
-                  >
-                    User Management
-                  </NavLink>
-                )}
+                {links.map((item) => (
+                  <div key={item.path}>
+                    <NavLink
+                      to={item.path}
+                      onClick={() => setMenuOpen(false)}
+                      className={({ isActive }) =>
+                        `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium ${isActive ? 'bg-teal-50 text-teal-800' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'}`
+                      }
+                    >
+                      <svg
+                        aria-hidden="true"
+                        className="h-5 w-5 shrink-0"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.6"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d={item.icon} />
+                      </svg>
+                      {item.title}
+                    </NavLink>
+                    {item.path === '/settings' && location.pathname.startsWith('/settings') && (
+                      <div>
+                        {settingsNavigation
+                          .filter((s) => permissions.includes(s.permission))
+                          .map((setting) => (
+                            <NavLink
+                              key={setting.path}
+                              to={setting.path}
+                              className={({ isActive }) =>
+                                `mt-1 ml-8 block rounded-md px-3 py-2 text-sm ${isActive ? 'bg-teal-50 font-medium text-teal-800' : 'text-slate-600'}`
+                              }
+                            >
+                              {setting.title}
+                            </NavLink>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             ))}
           </nav>
@@ -169,7 +221,7 @@ export function AppLayout() {
                 </button>
               </div>
             )}
-            <Outlet />
+            {session.user.organizationId ? <Outlet /> : <OrganizationPage setup />}
           </div>
         </main>
       </div>
