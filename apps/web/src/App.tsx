@@ -3,6 +3,7 @@ import { LoginPage } from './pages/LoginPage';
 import { AppLayout } from './layouts/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { AttendancePage } from './pages/AttendancePage';
+import { SchedulesPage, TimeRecordsPage, LeavePage } from './pages/TimekeepingPages';
 import { SystemHealthPage } from './components/system/SystemHealth';
 import { SettingsPage } from './pages/SettingsPage';
 import {
@@ -39,6 +40,30 @@ function AppRoutes() {
         element={session ? <Navigate to="/dashboard" replace /> : <LoginPage />}
       />
       <Route element={session ? <AppLayout /> : <Navigate to="/login" replace />}>
+        <Route
+          path="/schedules"
+          element={
+            <Protected permission="schedules.view">
+              <SchedulesPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/time-records"
+          element={
+            <Protected permission="time_records.view">
+              <TimeRecordsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/leave"
+          element={
+            <Protected permission="leave.view">
+              <LeavePage />
+            </Protected>
+          }
+        />
         <Route
           path="/dashboard"
           element={

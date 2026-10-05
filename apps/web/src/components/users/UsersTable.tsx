@@ -1,5 +1,6 @@
 import type { ManagedUser } from '@hexpayroll/shared';
 import { StatusIndicator } from '../system/StatusIndicator';
+import { useOrganizationTime } from '../../pages/TimekeepingPages';
 export function UsersTable({
   users,
   emptyMessage = 'No users found.',
@@ -9,6 +10,7 @@ export function UsersTable({
   emptyMessage?: string;
   onEdit?: (user: ManagedUser) => void;
 }) {
+  const { timezone } = useOrganizationTime();
   return (
     <div className="overflow-x-auto">
       <table className="data-table">
@@ -35,9 +37,9 @@ export function UsersTable({
                   </StatusIndicator>
                 </td>
                 <td>
-                  {user.lastLoginAt
+                  {user.lastLoginAt && timezone
                     ? new Intl.DateTimeFormat('en-PH', {
-                        timeZone: 'Asia/Manila',
+                        timeZone: timezone,
                         dateStyle: 'medium',
                         timeStyle: 'short',
                       }).format(new Date(user.lastLoginAt))

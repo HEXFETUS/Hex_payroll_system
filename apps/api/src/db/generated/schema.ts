@@ -1,4 +1,4 @@
-import { pgTable, foreignKey, check, uuid, text, timestamp, index, char, type PgTableExtraConfigValue, uniqueIndex, unique, varchar, boolean, integer, jsonb, date, bigint, primaryKey } from "drizzle-orm/pg-core"
+import { pgTable, foreignKey, check, uuid, text, timestamp, index, char, type PgTableExtraConfigValue, uniqueIndex, unique, varchar, boolean, integer, jsonb, date, bigint, smallint, time, primaryKey } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 
 
@@ -90,6 +90,36 @@ export const payrollConfigurations = pgTable("payroll_configurations", {
 	check("payroll_configuration_required_check", sql`(configuration ?& ARRAY['payFrequency'::text, 'workWeekdays'::text, 'workStart'::text, 'workEnd'::text, 'breakMinutes'::text, 'standardMinutesPerDay'::text, 'graceMinutes'::text, 'lateEnabled'::text, 'undertimeEnabled'::text, 'overtimeEnabled'::text, 'roundingMode'::text, 'roundingIncrementMinutes'::text]) AND ((configuration ->> 'payFrequency'::text) = ANY (ARRAY['monthly'::text, 'semi_monthly'::text, 'weekly'::text, 'biweekly'::text])) AND ((configuration ->> 'roundingMode'::text) = ANY (ARRAY['none'::text, 'nearest'::text, 'up'::text, 'down'::text])) AND (jsonb_typeof((configuration -> 'workWeekdays'::text)) = 'array'::text) AND (jsonb_typeof((configuration -> 'lateEnabled'::text)) = 'boolean'::text) AND (jsonb_typeof((configuration -> 'undertimeEnabled'::text)) = 'boolean'::text) AND (jsonb_typeof((configuration -> 'overtimeEnabled'::text)) = 'boolean'::text) AND ((((configuration ->> 'breakMinutes'::text))::integer >= 0) AND (((configuration ->> 'breakMinutes'::text))::integer <= 1440)) AND ((((configuration ->> 'standardMinutesPerDay'::text))::integer >= 1) AND (((configuration ->> 'standardMinutesPerDay'::text))::integer <= 1440)) AND ((((configuration ->> 'graceMinutes'::text))::integer >= 0) AND (((configuration ->> 'graceMinutes'::text))::integer <= 1440)) AND ((((configuration ->> 'roundingIncrementMinutes'::text))::integer >= 1) AND (((configuration ->> 'roundingIncrementMinutes'::text))::integer <= 60))`),
 	check("payroll_configurations_configuration_check", sql`jsonb_typeof(configuration) = 'object'::text`),
 	check("payroll_configurations_revision_check", sql`revision > 0`),
+]);
+
+export const workSchedules = pgTable("work_schedules", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	code: text().notNull(),
+	name: text().notNull(),
+	description: text(),
+	status: text().default('active').notNull(),
+	revision: integer().default(1).notNull(),
+	updatedBy: uuid("updated_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	uniqueIndex("schedules_code_unique").using("btree", sql`organization_id`, sql`lower(code)`),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "work_schedules_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.updatedBy],
+			foreignColumns: [authUsers.id],
+			name: "work_schedules_updated_by_fkey"
+		}),
+	unique("work_schedules_organization_id_id_key").on(table.id, table.organizationId),
+	check("work_schedules_code_check", sql`length(btrim(code)) > 0`),
+	check("work_schedules_name_check", sql`length(btrim(name)) > 0`),
+	check("work_schedules_revision_check", sql`revision > 0`),
+	check("work_schedules_status_check", sql`status = ANY (ARRAY['active'::text, 'inactive'::text])`),
 ]);
 
 export const auditEvents = pgTable("audit_events", {
@@ -308,6 +338,67 @@ export const employees = pgTable("employees", {
 	check("employees_status_check", sql`status = ANY (ARRAY['active'::text, 'inactive'::text, 'on_leave'::text, 'terminated'::text])`),
 ]);
 
+export const scheduleAssignmentHistory = pgTable("schedule_assignment_history", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	assignmentId: uuid("assignment_id").notNull(),
+	revision: integer().notNull(),
+	snapshot: jsonb().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.organizationId, table.assignmentId],
+			foreignColumns: [employeeScheduleAssignments.id, employeeScheduleAssignments.organizationId],
+			name: "schedule_assignment_history_organization_id_assignment_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "schedule_assignment_history_organization_id_fkey"
+		}),
+	unique("schedule_assignment_history_assignment_id_revision_key").on(table.assignmentId, table.revision),
+	check("schedule_assignment_history_revision_check", sql`revision > 0`),
+]);
+
+export const employeeScheduleAssignments = pgTable("employee_schedule_assignments", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	employeeId: uuid("employee_id").notNull(),
+	scheduleId: uuid("schedule_id").notNull(),
+	effectiveFrom: date("effective_from").notNull(),
+	effectiveTo: date("effective_to"),
+	reason: text(),
+	revision: integer().default(1).notNull(),
+	updatedBy: uuid("updated_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	index("schedule_assignment_dates_idx").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops"), table.employeeId.asc().nullsLast().op("date_ops"), table.effectiveFrom.asc().nullsLast().op("date_ops")),
+	foreignKey({
+			columns: [table.organizationId, table.employeeId],
+			foreignColumns: [employees.id, employees.organizationId],
+			name: "employee_schedule_assignments_organization_id_employee_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "employee_schedule_assignments_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.scheduleId],
+			foreignColumns: [workSchedules.id, workSchedules.organizationId],
+			name: "employee_schedule_assignments_organization_id_schedule_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.updatedBy],
+			foreignColumns: [authUsers.id],
+			name: "employee_schedule_assignments_updated_by_fkey"
+		}),
+	unique("employee_schedule_assignments_organization_id_id_key").on(table.id, table.organizationId),
+	check("employee_schedule_assignments_check", sql`effective_to > effective_from`),
+	check("employee_schedule_assignments_revision_check", sql`revision > 0`),
+]);
+
 export const biometricDevices = pgTable("biometric_devices", {
 	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
 	organizationId: uuid("organization_id").notNull(),
@@ -461,6 +552,440 @@ export const syncOutbox = pgTable("sync_outbox", {
 	check("sync_outbox_revision_check", sql`revision > 0`),
 	check("sync_outbox_status_check", sql`status = ANY (ARRAY['pending'::text, 'processing'::text, 'synced'::text, 'failed'::text])`),
 	check("sync_outbox_version_check", sql`payload_version > 0`),
+]);
+
+export const timeRecords = pgTable("time_records", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	employeeId: uuid("employee_id").notNull(),
+	recordedAt: timestamp("recorded_at", { withTimezone: true, mode: 'string' }).notNull(),
+	recordType: text("record_type").notNull(),
+	source: text().notNull(),
+	deviceId: uuid("device_id"),
+	deviceEmployeeId: text("device_employee_id"),
+	externalRecordId: text("external_record_id"),
+	reason: text(),
+	createdBy: uuid("created_by").notNull(),
+	revision: integer().default(1).notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	index("time_records_employee_date_idx").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops"), table.employeeId.asc().nullsLast().op("uuid_ops"), table.recordedAt.asc().nullsLast().op("timestamptz_ops")),
+	uniqueIndex("time_records_external_unique").using("btree", table.deviceId.asc().nullsLast().op("uuid_ops"), table.externalRecordId.asc().nullsLast().op("uuid_ops")).where(sql`(external_record_id IS NOT NULL)`),
+	uniqueIndex("time_records_fallback_unique").using("btree", table.deviceId.asc().nullsLast().op("uuid_ops"), table.deviceEmployeeId.asc().nullsLast().op("uuid_ops"), table.recordedAt.asc().nullsLast().op("text_ops"), table.recordType.asc().nullsLast().op("uuid_ops")).where(sql`((external_record_id IS NULL) AND (device_id IS NOT NULL))`),
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [authUsers.id],
+			name: "time_records_created_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.deviceId],
+			foreignColumns: [biometricDevices.id, biometricDevices.organizationId],
+			name: "time_records_organization_id_device_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.employeeId],
+			foreignColumns: [employees.id, employees.organizationId],
+			name: "time_records_organization_id_employee_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "time_records_organization_id_fkey"
+		}),
+	unique("time_records_organization_id_id_key").on(table.id, table.organizationId),
+	check("time_records_check", sql`(source <> 'manual'::text) OR (length(btrim(reason)) > 0)`),
+	check("time_records_check1", sql`(source <> 'biometric'::text) OR ((device_id IS NOT NULL) AND (device_employee_id IS NOT NULL))`),
+	check("time_records_check2", sql`(source <> 'manual'::text) OR ((reason IS NOT NULL) AND (length(btrim(reason)) > 0))`),
+	check("time_records_record_type_check", sql`record_type = ANY (ARRAY['in'::text, 'out'::text, 'break_out'::text, 'break_in'::text, 'unknown'::text])`),
+	check("time_records_revision_check", sql`revision = 1`),
+	check("time_records_source_check", sql`source = ANY (ARRAY['biometric'::text, 'manual'::text, 'import'::text, 'system'::text])`),
+]);
+
+export const biometricIngestionState = pgTable("biometric_ingestion_state", {
+	deviceId: uuid("device_id").primaryKey().notNull(),
+	lastIngestionAt: timestamp("last_ingestion_at", { withTimezone: true, mode: 'string' }).notNull(),
+	lastRecordAt: timestamp("last_record_at", { withTimezone: true, mode: 'string' }),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.deviceId],
+			foreignColumns: [biometricDevices.id],
+			name: "biometric_ingestion_state_device_id_fkey"
+		}),
+]);
+
+export const timeRecordCorrections = pgTable("time_record_corrections", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	timeRecordId: uuid("time_record_id").notNull(),
+	operation: text().notNull(),
+	recordedAt: timestamp("recorded_at", { withTimezone: true, mode: 'string' }),
+	recordType: text("record_type"),
+	reason: text().notNull(),
+	revision: integer().notNull(),
+	createdBy: uuid("created_by").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [authUsers.id],
+			name: "time_record_corrections_created_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "time_record_corrections_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.timeRecordId],
+			foreignColumns: [timeRecords.id, timeRecords.organizationId],
+			name: "time_record_corrections_organization_id_time_record_id_fkey"
+		}),
+	unique("time_record_corrections_time_record_id_revision_key").on(table.revision, table.timeRecordId),
+	check("time_record_corrections_check", sql`(operation = 'void'::text) OR ((recorded_at IS NOT NULL) AND (record_type IS NOT NULL))`),
+	check("time_record_corrections_operation_check", sql`operation = ANY (ARRAY['replace'::text, 'void'::text])`),
+	check("time_record_corrections_reason_check", sql`length(btrim(reason)) > 0`),
+	check("time_record_corrections_record_type_check", sql`record_type = ANY (ARRAY['in'::text, 'out'::text, 'break_out'::text, 'break_in'::text, 'unknown'::text])`),
+	check("time_record_corrections_revision_check", sql`revision > 0`),
+]);
+
+export const attendanceRecords = pgTable("attendance_records", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	employeeId: uuid("employee_id").notNull(),
+	workDate: date("work_date").notNull(),
+	scheduleAssignmentId: uuid("schedule_assignment_id"),
+	scheduleVersionId: uuid("schedule_version_id"),
+	firstIn: timestamp("first_in", { withTimezone: true, mode: 'string' }),
+	lastOut: timestamp("last_out", { withTimezone: true, mode: 'string' }),
+	workedMinutes: integer("worked_minutes").default(0).notNull(),
+	lateMinutes: integer("late_minutes").default(0).notNull(),
+	undertimeMinutes: integer("undertime_minutes").default(0).notNull(),
+	attendanceStatus: text("attendance_status").notNull(),
+	approvalStatus: text("approval_status").default('unreviewed').notNull(),
+	inputHash: text("input_hash").notNull(),
+	result: jsonb().notNull(),
+	approvedBy: uuid("approved_by"),
+	approvedAt: timestamp("approved_at", { withTimezone: true, mode: 'string' }),
+	revision: integer().default(1).notNull(),
+	updatedBy: uuid("updated_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	index("attendance_date_idx").using("btree", table.organizationId.asc().nullsLast().op("date_ops"), table.workDate.asc().nullsLast().op("uuid_ops"), table.attendanceStatus.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.approvedBy],
+			foreignColumns: [authUsers.id],
+			name: "attendance_records_approved_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.employeeId],
+			foreignColumns: [employees.id, employees.organizationId],
+			name: "attendance_records_organization_id_employee_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "attendance_records_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.scheduleAssignmentId],
+			foreignColumns: [employeeScheduleAssignments.id, employeeScheduleAssignments.organizationId],
+			name: "attendance_records_organization_id_schedule_assignment_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.scheduleVersionId],
+			foreignColumns: [workScheduleVersions.id, workScheduleVersions.organizationId],
+			name: "attendance_records_organization_id_schedule_version_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.updatedBy],
+			foreignColumns: [authUsers.id],
+			name: "attendance_records_updated_by_fkey"
+		}),
+	unique("attendance_records_organization_id_employee_id_work_date_key").on(table.employeeId, table.organizationId, table.workDate),
+	unique("attendance_records_organization_id_id_key").on(table.id, table.organizationId),
+	check("attendance_records_approval_status_check", sql`approval_status = ANY (ARRAY['unreviewed'::text, 'approved'::text, 'needs_review'::text])`),
+	check("attendance_records_attendance_status_check", sql`attendance_status = ANY (ARRAY['present'::text, 'late'::text, 'absent'::text, 'on_leave'::text, 'rest_day'::text, 'incomplete'::text])`),
+	check("attendance_records_late_minutes_check", sql`late_minutes >= 0`),
+	check("attendance_records_revision_check", sql`revision > 0`),
+	check("attendance_records_undertime_minutes_check", sql`undertime_minutes >= 0`),
+	check("attendance_records_worked_minutes_check", sql`worked_minutes >= 0`),
+]);
+
+export const leaveTypes = pgTable("leave_types", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	code: text().notNull(),
+	name: text().notNull(),
+	description: text(),
+	paid: boolean().notNull(),
+	requiresApproval: boolean("requires_approval").default(true).notNull(),
+	status: text().default('active').notNull(),
+	revision: integer().default(1).notNull(),
+	updatedBy: uuid("updated_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	uniqueIndex("leave_types_code_unique").using("btree", sql`organization_id`, sql`lower(code)`),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "leave_types_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.updatedBy],
+			foreignColumns: [authUsers.id],
+			name: "leave_types_updated_by_fkey"
+		}),
+	unique("leave_types_organization_id_id_key").on(table.id, table.organizationId),
+	check("leave_types_code_check", sql`length(btrim(code)) > 0`),
+	check("leave_types_name_check", sql`length(btrim(name)) > 0`),
+	check("leave_types_revision_check", sql`revision > 0`),
+	check("leave_types_status_check", sql`status = ANY (ARRAY['active'::text, 'inactive'::text])`),
+]);
+
+export const leaveRequests = pgTable("leave_requests", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	employeeId: uuid("employee_id").notNull(),
+	leaveTypeId: uuid("leave_type_id").notNull(),
+	startDate: date("start_date").notNull(),
+	endDate: date("end_date").notNull(),
+	durationType: text("duration_type").notNull(),
+	reason: text().notNull(),
+	status: text().notNull(),
+	typeSnapshot: jsonb("type_snapshot").notNull(),
+	requestedBy: uuid("requested_by").notNull(),
+	requestedAt: timestamp("requested_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	approvedBy: uuid("approved_by"),
+	approvedAt: timestamp("approved_at", { withTimezone: true, mode: 'string' }),
+	rejectedBy: uuid("rejected_by"),
+	rejectedAt: timestamp("rejected_at", { withTimezone: true, mode: 'string' }),
+	cancelledBy: uuid("cancelled_by"),
+	cancelledAt: timestamp("cancelled_at", { withTimezone: true, mode: 'string' }),
+	remarks: text(),
+	revision: integer().default(1).notNull(),
+	updatedBy: uuid("updated_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	index("leave_employee_dates_idx").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops"), table.employeeId.asc().nullsLast().op("uuid_ops"), table.startDate.asc().nullsLast().op("date_ops"), table.endDate.asc().nullsLast().op("uuid_ops")),
+	index("leave_pending_idx").using("btree", table.organizationId.asc().nullsLast().op("uuid_ops"), table.status.asc().nullsLast().op("date_ops"), table.startDate.asc().nullsLast().op("uuid_ops")),
+	foreignKey({
+			columns: [table.approvedBy],
+			foreignColumns: [authUsers.id],
+			name: "leave_requests_approved_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.cancelledBy],
+			foreignColumns: [authUsers.id],
+			name: "leave_requests_cancelled_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.employeeId],
+			foreignColumns: [employees.id, employees.organizationId],
+			name: "leave_requests_organization_id_employee_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "leave_requests_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.leaveTypeId],
+			foreignColumns: [leaveTypes.id, leaveTypes.organizationId],
+			name: "leave_requests_organization_id_leave_type_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.rejectedBy],
+			foreignColumns: [authUsers.id],
+			name: "leave_requests_rejected_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.requestedBy],
+			foreignColumns: [authUsers.id],
+			name: "leave_requests_requested_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.updatedBy],
+			foreignColumns: [authUsers.id],
+			name: "leave_requests_updated_by_fkey"
+		}),
+	unique("leave_requests_organization_id_id_key").on(table.id, table.organizationId),
+	check("leave_requests_check", sql`end_date >= start_date`),
+	check("leave_requests_check1", sql`(duration_type = 'full_day'::text) OR (start_date = end_date)`),
+	check("leave_requests_duration_type_check", sql`duration_type = ANY (ARRAY['full_day'::text, 'first_half'::text, 'second_half'::text])`),
+	check("leave_requests_reason_check", sql`length(btrim(reason)) > 0`),
+	check("leave_requests_revision_check", sql`revision > 0`),
+	check("leave_requests_status_check", sql`status = ANY (ARRAY['pending'::text, 'approved'::text, 'rejected'::text, 'cancelled'::text])`),
+]);
+
+export const attendanceProcessingJobs = pgTable("attendance_processing_jobs", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	employeeId: uuid("employee_id").notNull(),
+	startDate: date("start_date").notNull(),
+	endDate: date("end_date").notNull(),
+	nextDate: date("next_date").notNull(),
+	requestedBy: uuid("requested_by"),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	lastError: text("last_error"),
+	priority: smallint().default(0).notNull(),
+	lastProcessedAt: timestamp("last_processed_at", { withTimezone: true, mode: 'string' }),
+	reason: text(),
+}, (table): PgTableExtraConfigValue[] => [
+	index("attendance_jobs_claim_idx").using("btree", sql`priority`, sql`COALESCE(last_processed_at, created_at)`, sql`id`).where(sql`(last_error IS NULL)`),
+	index("attendance_jobs_pending_idx").using("btree", table.createdAt.asc().nullsLast().op("timestamptz_ops")),
+	foreignKey({
+			columns: [table.organizationId, table.employeeId],
+			foreignColumns: [employees.id, employees.organizationId],
+			name: "attendance_processing_jobs_organization_id_employee_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "attendance_processing_jobs_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.requestedBy],
+			foreignColumns: [authUsers.id],
+			name: "attendance_processing_jobs_requested_by_fkey"
+		}),
+	check("attendance_processing_jobs_check", sql`end_date >= start_date`),
+]);
+
+export const attendanceProcessingCursors = pgTable("attendance_processing_cursors", {
+	organizationId: uuid("organization_id").primaryKey().notNull(),
+	nextDate: date("next_date").notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "attendance_processing_cursors_organization_id_fkey"
+		}),
+]);
+
+export const attendanceHistory = pgTable("attendance_history", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	attendanceId: uuid("attendance_id").notNull(),
+	revision: integer().notNull(),
+	snapshot: jsonb().notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.organizationId, table.attendanceId],
+			foreignColumns: [attendanceRecords.id, attendanceRecords.organizationId],
+			name: "attendance_history_organization_id_attendance_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "attendance_history_organization_id_fkey"
+		}),
+	unique("attendance_history_attendance_id_revision_key").on(table.attendanceId, table.revision),
+]);
+
+export const attendanceAdjustments = pgTable("attendance_adjustments", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	attendanceId: uuid("attendance_id").notNull(),
+	overrides: jsonb().notNull(),
+	reason: text().notNull(),
+	revision: integer().notNull(),
+	createdBy: uuid("created_by").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [authUsers.id],
+			name: "attendance_adjustments_created_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.attendanceId],
+			foreignColumns: [attendanceRecords.id, attendanceRecords.organizationId],
+			name: "attendance_adjustments_organization_id_attendance_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "attendance_adjustments_organization_id_fkey"
+		}),
+	unique("attendance_adjustments_attendance_id_revision_key").on(table.attendanceId, table.revision),
+	check("attendance_adjustments_reason_check", sql`length(btrim(reason)) > 0`),
+	check("attendance_adjustments_revision_check", sql`revision > 0`),
+]);
+
+export const workScheduleVersions = pgTable("work_schedule_versions", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	scheduleId: uuid("schedule_id").notNull(),
+	effectiveFrom: date("effective_from").notNull(),
+	reason: text(),
+	timezone: text().notNull(),
+	revision: integer().default(1).notNull(),
+	createdBy: uuid("created_by").notNull(),
+	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+	name: text().notNull(),
+	code: text().notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.createdBy],
+			foreignColumns: [authUsers.id],
+			name: "work_schedule_versions_created_by_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "work_schedule_versions_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.scheduleId],
+			foreignColumns: [workSchedules.id, workSchedules.organizationId],
+			name: "work_schedule_versions_organization_id_schedule_id_fkey"
+		}),
+	unique("work_schedule_versions_organization_id_id_key").on(table.id, table.organizationId),
+	unique("work_schedule_versions_schedule_id_effective_from_key").on(table.effectiveFrom, table.scheduleId),
+	check("work_schedule_versions_code_check", sql`length(btrim(code)) > 0`),
+	check("work_schedule_versions_name_check", sql`length(btrim(name)) > 0`),
+	check("work_schedule_versions_revision_check", sql`revision = 1`),
+]);
+
+export const workScheduleDays = pgTable("work_schedule_days", {
+	id: uuid().default(sql`uuidv7()`).primaryKey().notNull(),
+	organizationId: uuid("organization_id").notNull(),
+	versionId: uuid("version_id").notNull(),
+	dayOfWeek: integer("day_of_week").notNull(),
+	isWorkDay: boolean("is_work_day").notNull(),
+	startTime: time("start_time"),
+	endTime: time("end_time"),
+	endDayOffset: integer("end_day_offset").default(0).notNull(),
+	breakStart: time("break_start"),
+	breakEnd: time("break_end"),
+	breakStartDayOffset: integer("break_start_day_offset").default(0).notNull(),
+	breakEndDayOffset: integer("break_end_day_offset").default(0).notNull(),
+	graceMinutes: integer("grace_minutes").default(0).notNull(),
+}, (table): PgTableExtraConfigValue[] => [
+	foreignKey({
+			columns: [table.organizationId],
+			foreignColumns: [organizations.id],
+			name: "work_schedule_days_organization_id_fkey"
+		}),
+	foreignKey({
+			columns: [table.organizationId, table.versionId],
+			foreignColumns: [workScheduleVersions.id, workScheduleVersions.organizationId],
+			name: "work_schedule_days_organization_id_version_id_fkey"
+		}),
+	unique("work_schedule_days_version_id_day_of_week_key").on(table.dayOfWeek, table.versionId),
+	check("schedule_break_absolute_bounds", sql`(break_start IS NULL) OR ((((break_start - start_time) + ((break_start_day_offset)::double precision * '1 day'::interval)) >= '00:00:00'::interval) AND (((break_end - end_time) + (((break_end_day_offset - end_day_offset))::double precision * '1 day'::interval)) <= '00:00:00'::interval) AND (((break_end - break_start) + (((break_end_day_offset - break_start_day_offset))::double precision * '1 day'::interval)) < ((end_time - start_time) + ((end_day_offset)::double precision * '1 day'::interval))))`),
+	check("schedule_break_pair", sql`((break_start IS NULL) AND (break_end IS NULL)) OR ((break_start IS NOT NULL) AND (break_end IS NOT NULL) AND (start_time IS NOT NULL) AND (end_time IS NOT NULL) AND (((break_end - break_start) + (((break_end_day_offset - break_start_day_offset))::double precision * '1 day'::interval)) > '00:00:00'::interval))`),
+	check("work_schedule_days_break_end_day_offset_check", sql`break_end_day_offset = ANY (ARRAY[0, 1])`),
+	check("work_schedule_days_break_start_day_offset_check", sql`break_start_day_offset = ANY (ARRAY[0, 1])`),
+	check("work_schedule_days_check", sql`(NOT is_work_day) OR ((start_time IS NOT NULL) AND (end_time IS NOT NULL) AND (((end_time - start_time) + ((end_day_offset)::double precision * '1 day'::interval)) > '00:00:00'::interval) AND (((end_time - start_time) + ((end_day_offset)::double precision * '1 day'::interval)) <= '24:00:00'::interval))`),
+	check("work_schedule_days_check1", sql`is_work_day OR ((start_time IS NULL) AND (end_time IS NULL) AND (break_start IS NULL) AND (break_end IS NULL))`),
+	check("work_schedule_days_day_of_week_check", sql`(day_of_week >= 0) AND (day_of_week <= 6)`),
+	check("work_schedule_days_end_day_offset_check", sql`end_day_offset = ANY (ARRAY[0, 1])`),
+	check("work_schedule_days_grace_minutes_check", sql`(grace_minutes >= 0) AND (grace_minutes <= 240)`),
 ]);
 
 export const userRoles = pgTable("user_roles", {

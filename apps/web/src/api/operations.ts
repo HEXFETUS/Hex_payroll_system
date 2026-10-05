@@ -1,45 +1,35 @@
-import { dashboardSummarySchema } from '@hexpayroll/shared';
+import {
+  dashboardSummarySchema,
+  attendanceRecordSchema,
+  type AttendanceRecord,
+  type AttendanceStatus,
+} from '@hexpayroll/shared';
 import { foundationRequest } from './foundation';
-
-export const attendanceStatuses = ['Present', 'Late', 'Absent', 'On Leave'] as const;
-export type AttendanceStatus = (typeof attendanceStatuses)[number];
-export interface AttendanceRecord {
-  id: string;
-  employeeId: string;
-  employeeName: string;
-  timeIn: string | null;
-  timeOut: string | null;
-  hoursWorked: number | null;
-  status: AttendanceStatus;
-  source: 'Biometric' | 'Manual';
-}
-export interface AttendanceFilters {
-  date: string;
-  employee: string;
-  status: AttendanceStatus | '';
-}
-export interface DashboardSummary {
-  totalEmployees: number;
-  activeEmployees: number;
-  departments: number;
-  present: number;
-  absent: number;
-  late: number;
-  onLeave: number;
-}
+import { z } from 'zod';
+export type { AttendanceRecord, AttendanceStatus };
 export type IntegrationResult<T> =
   { kind: 'available'; data: T } | { kind: 'unavailable'; message: string };
-export async function readDashboardSummary(
-  token: string,
-): Promise<IntegrationResult<DashboardSummary>> {
-  const data = dashboardSummarySchema.parse(await foundationRequest('dashboard/summary', token));
-  return { kind: 'available', data: { ...data, present: 0, absent: 0, late: 0, onLeave: 0 } };
+export async function readDashboardSummary(token: string) {
+  return {
+    kind: 'available' as const,
+    data: dashboardSummarySchema.parse(await foundationRequest('dashboard/summary', token)),
+  };
 }
 export async function readAttendance(
-  _filters: AttendanceFilters,
+  filters: { date: string; employee: string; status: AttendanceStatus | '' },
+  token: string,
 ): Promise<IntegrationResult<AttendanceRecord[]>> {
-  return {
-    kind: 'unavailable',
-    message: 'Attendance integration is pending. No attendance data is available yet.',
-  };
+  const response = z
+    .object({ items: z.array(attendanceRecordSchema) })
+    .parse(
+      await foundationRequest(
+        'attendance?date=' +
+          filters.date +
+          '&search=' +
+          encodeURIComponent(filters.employee) +
+          (filters.status ? '&status=' + filters.status : ''),
+        token,
+      ),
+    );
+  return { kind: 'available', data: response.items };
 }

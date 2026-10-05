@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { EmployeeSchedule } from './TimekeepingPages';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { z } from 'zod';
@@ -240,7 +241,7 @@ export function OrganizationPage({ setup = false }: { setup?: boolean }) {
           fields={organizationFields}
           initial={
             organization.data ?? {
-              timezone: 'Asia/Manila',
+              timezone: organizationInputSchema.shape.timezone.parse(undefined),
               currency: 'PHP',
               country: 'PH',
               status: 'active',
@@ -677,6 +678,7 @@ export function EmployeeProfilePage() {
               }}
             />
           )}
+          <EmployeeSchedule employee={record.data} />
           <h2 className="font-semibold">Personal Information</h2>
           <RecordDetails
             record={

@@ -28,6 +28,19 @@ const navigation = [
     icon: 'M5 5h14v16H5z M8 3v4 M16 3v4 M5 10h14 M8 14h3 M8 17h7',
   },
   {
+    group: 'Workforce',
+    title: 'Time Records',
+    path: '/time-records',
+    icon: 'M5 5h14v16H5z M8 10h8 M8 14h8',
+  },
+  { group: 'Workforce', title: 'Leave', path: '/leave', icon: 'M5 5h14v16H5z M8 10h8 M8 14h8' },
+  {
+    group: 'Workforce',
+    title: 'Schedules',
+    path: '/schedules',
+    icon: 'M5 5h14v16H5z M8 10h8 M8 14h8',
+  },
+  {
     group: 'System',
     title: 'System Health',
     path: '/system-health',
@@ -86,6 +99,9 @@ export function AppLayout() {
   const permissions: readonly string[] =
     verification.data?.user.permissions ?? session.user.permissions ?? [];
   const routePermissions: Record<string, string> = {
+    '/time-records': 'time_records.view',
+    '/leave': 'leave.view',
+    '/schedules': 'schedules.view',
     '/dashboard': 'dashboard.view',
     '/employees': 'employees.view',
     '/attendance': 'attendance.view',
