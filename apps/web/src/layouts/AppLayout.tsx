@@ -10,6 +10,24 @@ import { settingsNavigation } from '../pages/SettingsPage';
 
 const navigation = [
   {
+    group: 'Payroll',
+    title: 'Payroll Periods',
+    path: '/payroll/periods',
+    icon: 'M5 5h14v16H5z M8 10h8 M8 14h8',
+  },
+  {
+    group: 'Payroll',
+    title: 'Earnings',
+    path: '/payroll/earnings',
+    icon: 'M5 5h14v16H5z M8 10h8 M8 14h8',
+  },
+  {
+    group: 'Payroll',
+    title: 'Deductions',
+    path: '/payroll/deductions',
+    icon: 'M5 5h14v16H5z M8 10h8 M8 14h8',
+  },
+  {
     group: 'Main',
     title: 'Dashboard',
     path: '/dashboard',
@@ -99,6 +117,9 @@ export function AppLayout() {
   const permissions: readonly string[] =
     verification.data?.user.permissions ?? session.user.permissions ?? [];
   const routePermissions: Record<string, string> = {
+    '/payroll/periods': 'payroll.view',
+    '/payroll/earnings': 'earnings.view',
+    '/payroll/deductions': 'deductions.view',
     '/time-records': 'time_records.view',
     '/leave': 'leave.view',
     '/schedules': 'schedules.view',
@@ -109,7 +130,10 @@ export function AppLayout() {
     '/sync-status': 'sync.view',
   };
   const navigationGroups = new Map<string, typeof navigation>();
-  for (const item of navigation) {
+  const groupOrder = ['Main', 'Workforce', 'Payroll', 'System', 'Administration'];
+  for (const item of [...navigation].sort(
+    (a, b) => groupOrder.indexOf(a.group) - groupOrder.indexOf(b.group),
+  )) {
     if (item.path !== '/settings' && !permissions.includes(routePermissions[item.path] ?? ''))
       continue;
     const group = navigationGroups.get(item.group) ?? [];
@@ -197,7 +221,12 @@ export function AppLayout() {
                     {item.path === '/settings' && location.pathname.startsWith('/settings') && (
                       <div>
                         {settingsNavigation
-                          .filter((s) => permissions.includes(s.permission))
+                          .filter(
+                            (s) =>
+                              permissions.includes(s.permission) ||
+                              (s.path === '/settings/statutory-tables' &&
+                                permissions.includes('tax.view')),
+                          )
                           .map((setting) => (
                             <NavLink
                               key={setting.path}

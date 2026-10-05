@@ -1,5 +1,17 @@
 import { relations } from 'drizzle-orm';
 import {
+  payrollPeriods,
+  payrollRuns,
+  employeePayrollResults,
+  payrollEarningLines,
+  payrollDeductionLines,
+  payrollContributionLines,
+  statutoryRuleSets,
+  payrollPolicies,
+  payrollTypes,
+  payrollEntries,
+} from './generated/schema.js';
+import {
   organizations,
   employees,
   employmentVersions,
@@ -166,5 +178,94 @@ export const permissionRelations = relations(rolePermissions, ({ one }) => ({
   permission: one(permissions, {
     fields: [rolePermissions.permissionCode],
     references: [permissions.code],
+  }),
+}));
+
+export const payrollPeriodRelations = relations(payrollPeriods, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [payrollPeriods.organizationId],
+    references: [organizations.id],
+  }),
+  runs: many(payrollRuns, { relationName: 'periodRuns' }),
+  latestRun: one(payrollRuns, {
+    fields: [payrollPeriods.latestRunId],
+    references: [payrollRuns.id],
+    relationName: 'latestPayrollRun',
+  }),
+  reviewedRun: one(payrollRuns, {
+    fields: [payrollPeriods.reviewedRunId],
+    references: [payrollRuns.id],
+    relationName: 'reviewedPayrollRun',
+  }),
+}));
+export const payrollRunRelations = relations(payrollRuns, ({ one, many }) => ({
+  period: one(payrollPeriods, {
+    fields: [payrollRuns.periodId],
+    references: [payrollPeriods.id],
+    relationName: 'periodRuns',
+  }),
+  results: many(employeePayrollResults),
+}));
+export const payrollResultRelations = relations(employeePayrollResults, ({ one, many }) => ({
+  run: one(payrollRuns, {
+    fields: [employeePayrollResults.payrollRunId],
+    references: [payrollRuns.id],
+  }),
+  employee: one(employees, {
+    fields: [employeePayrollResults.employeeId],
+    references: [employees.id],
+  }),
+  earnings: many(payrollEarningLines),
+  deductions: many(payrollDeductionLines),
+  contributions: many(payrollContributionLines),
+}));
+export const payrollEarningRelations = relations(payrollEarningLines, ({ one }) => ({
+  result: one(employeePayrollResults, {
+    fields: [payrollEarningLines.resultId],
+    references: [employeePayrollResults.id],
+  }),
+}));
+export const payrollDeductionRelations = relations(payrollDeductionLines, ({ one }) => ({
+  result: one(employeePayrollResults, {
+    fields: [payrollDeductionLines.resultId],
+    references: [employeePayrollResults.id],
+  }),
+}));
+export const payrollContributionRelations = relations(payrollContributionLines, ({ one }) => ({
+  result: one(employeePayrollResults, {
+    fields: [payrollContributionLines.resultId],
+    references: [employeePayrollResults.id],
+  }),
+  rule: one(statutoryRuleSets, {
+    fields: [payrollContributionLines.ruleSetId],
+    references: [statutoryRuleSets.id],
+  }),
+}));
+export const payrollRuleRelations = relations(statutoryRuleSets, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [statutoryRuleSets.organizationId],
+    references: [organizations.id],
+  }),
+  contributions: many(payrollContributionLines),
+}));
+export const payrollPolicyRelations = relations(payrollPolicies, ({ one }) => ({
+  organization: one(organizations, {
+    fields: [payrollPolicies.organizationId],
+    references: [organizations.id],
+  }),
+}));
+export const payrollTypeRelations = relations(payrollTypes, ({ one, many }) => ({
+  organization: one(organizations, {
+    fields: [payrollTypes.organizationId],
+    references: [organizations.id],
+  }),
+  entries: many(payrollEntries),
+}));
+export const payrollEntryRelations = relations(payrollEntries, ({ one }) => ({
+  type: one(payrollTypes, { fields: [payrollEntries.typeId], references: [payrollTypes.id] }),
+  employee: one(employees, { fields: [payrollEntries.employeeId], references: [employees.id] }),
+  period: one(payrollPeriods, {
+    fields: [payrollEntries.periodId],
+    references: [payrollPeriods.id],
   }),
 }));

@@ -125,12 +125,25 @@ export function allocateCentavos(total: Centavos, weights: readonly number[]): C
 /** Formats centavos as a Philippine peso currency string, e.g. 123456 -> "₱1,234.56". */
 export function formatPeso(centavos: Centavos, locale = 'en-PH'): string {
   assertCentavos(centavos, 'centavos');
-  return new Intl.NumberFormat(locale, {
+  const formatter = new Intl.NumberFormat(locale, {
     style: 'currency',
     currency: 'PHP',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(centavos / CENTAVOS_PER_PESO);
+  });
+  // Dividing a near-limit safe centavo integer by 100 can lose its last centavo.
+  // Format the whole pesos as BigInt and supply the exact localized centavo digits.
+  const amount = BigInt(centavos),
+    whole = amount / 100n;
+  const fraction = new Intl.NumberFormat(locale, {
+    minimumIntegerDigits: 2,
+    useGrouping: false,
+    maximumFractionDigits: 0,
+  }).format(Number((amount < 0n ? -amount : amount) % 100n));
+  return formatter
+    .formatToParts(whole === 0n && centavos < 0 ? -0 : whole)
+    .map((part) => (part.type === 'fraction' ? fraction : part.value))
+    .join('');
 }
 
 /**

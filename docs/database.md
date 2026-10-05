@@ -68,6 +68,6 @@ and commit both together. Never hand-edit it. Hand-written query metadata lives 
 
 | Convention                                                                                                                            | Where                                                                                      |
 | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Money is `bigint` integer **centavos**, constrained to JavaScript safe-integer bounds; never a float | [`packages/shared.md`](packages/shared.md#moneyts--money-is-an-integer-number-of-centavos) |
+| Money is `bigint` integer **centavos**, constrained to JavaScript safe-integer bounds; never a float                                  | [`packages/shared.md`](packages/shared.md#moneyts--money-is-an-integer-number-of-centavos) |
 | Primary keys are UUIDv7 (`uuidv7()`, PostgreSQL 18): time-ordered, so a desktop can mint valid keys while offline without index bloat | Phase 1 migrations                                                                         |
 | Trigger functions (e.g. `hex_touch()`) are created by the migrator and are executable by the app role through default privileges      | `02_grant_app_privileges.sql`                                                              |

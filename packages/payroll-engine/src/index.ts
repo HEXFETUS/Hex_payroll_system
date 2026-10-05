@@ -1,23 +1,21 @@
 /**
  * Hex Payroll computation core.
  *
- * PHASE 0 SCOPE: contracts only.
+ * Phase 3: deterministic payroll stages and explicit versioned rule inputs.
  *
  * This package is deliberately a pure library — no I/O, no database, no
  * Electron, no Express. It must run identically inside the desktop app and on
  * the central server, and it must be exhaustively unit-testable.
  *
- * PAYROLL RULES ARE NOT IMPLEMENTED YET, BY DESIGN. Phase 0 establishes the
- * foundation (workspace, API, PostgreSQL, Electron) before any payroll-domain
- * complexity enters the project. Contribution and tax RATES will arrive as
- * versioned reference data with effectivity dates — never as literals in this
- * source file — so that a rate change does not require a new application
- * release.
+ * Contribution and tax rates are supplied as verified, versioned reference
+ * data. No production statutory rates are bundled in this library.
  */
 
 import type { Centavos } from '@hexpayroll/shared';
 
-export const PAYROLL_ENGINE_VERSION = '0.1.0';
+export const PAYROLL_ENGINE_VERSION = '0.3.0';
+export * from './arithmetic.js';
+export * from './computation.js';
 
 /** How a payroll period is cut. Philippine practice is typically semi-monthly. */
 export type PayrollPeriodKind = 'semi_monthly_first' | 'semi_monthly_second' | 'monthly';
