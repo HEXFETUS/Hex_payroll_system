@@ -4,11 +4,31 @@ import { StatusIndicator, type StatusTone } from './StatusIndicator';
 import { formatTime } from '../../utils/dates';
 import { useQuery } from '@tanstack/react-query';
 import { syncSummarySchema } from '@hexpayroll/shared';
+import { z } from 'zod';
 import { useAuth } from '../../auth/AuthProvider';
 import { foundationRequest } from '../../api/foundation';
 
 export function useHealthItems() {
   const { session } = useAuth();
+  const integration = useQuery({
+    queryKey: ['operations', 'biometric-health', session?.accessToken],
+    queryFn: async () =>
+      z
+        .object({
+          biometricIngestion: z.array(
+            z.object({
+              id: z.uuid(),
+              name: z.string(),
+              lastIngestionAt: z.string().nullable(),
+              lastRecordAt: z.string().nullable(),
+            }),
+          ),
+        })
+        .parse(await foundationRequest('system/details', session!.accessToken)),
+    enabled: !!session?.user.permissions?.includes('system_health.view'),
+    networkMode: 'always',
+    refetchInterval: 15000,
+  });
   const sync = useQuery({
     queryKey: ['operations', 'sync'],
     queryFn: async () =>
@@ -71,7 +91,7 @@ export function useHealthItems() {
       detail: 'Local changes are tracked in a durable outbox. The sync engine is not configured.',
     },
   ];
-  return { health, items, data };
+  return { health, items, data, integration };
 }
 export function HealthCard({
   name,
@@ -114,7 +134,7 @@ export function SystemHealthWidget() {
   );
 }
 export function SystemHealthPage() {
-  const { health, items, data } = useHealthItems();
+  const { health, items, data, integration } = useHealthItems();
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -131,7 +151,7 @@ export function SystemHealthPage() {
       </div>
       <p className="text-xs text-slate-500" role="status">
         {data
-          ? `Last checked: ${formatTime(data.timestamp)} (Philippine time)`
+          ? `Last checked: ${formatTime(data.timestamp, Intl.DateTimeFormat().resolvedOptions().timeZone)} (workstation time)`
           : 'No current verified health response.'}
       </p>
       {health.isError && (
@@ -145,6 +165,27 @@ export function SystemHealthPage() {
           <HealthCard key={item.name} {...item} />
         ))}
       </div>
+      <section className="panel p-5 space-y-3">
+        <h2 className="font-semibold">Biometric ingestion</h2>
+        <p>
+          Hardware communication is unconfigured. Received records remain available independently.
+        </p>
+        {integration.isPending ? (
+          <p>Loading ingestion status…</p>
+        ) : integration.isError ? (
+          <p role="alert">Unable to read ingestion status.</p>
+        ) : !integration.data?.biometricIngestion.length ? (
+          <p>No biometric devices configured.</p>
+        ) : (
+          integration.data.biometricIngestion.map((d) => (
+            <div key={d.id}>
+              <h3 className="font-medium">{d.name}</h3>
+              <p>Last successful ingestion: {d.lastIngestionAt ?? 'No batches received'}</p>
+              <p>Latest punch timestamp: {d.lastRecordAt ?? 'No records received'}</p>
+            </div>
+          ))
+        )}
+      </section>
     </div>
   );
 }

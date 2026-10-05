@@ -5,9 +5,9 @@ Offline-first desktop payroll system for Philippine payroll operations.
 A payroll clerk must be able to keep working when the Internet is unavailable, and
 synchronise later. That single requirement shapes every decision below.
 
-**Current phase: Phase 1 — core foundation.** Persisted company/workforce data,
-employment history, RBAC, configuration, audit, and atomic outbox tracking are connected.
-Payroll computation and full sync remain deferred. See [Phase 1](phase1-foundation.md).
+**Current phase: Phase 2 — timekeeping.** Persisted schedules, assignments, punch
+evidence/corrections, leave, attendance processing and approval extend the Phase 1
+foundation. Payroll computation and full sync remain deferred. See [Phase 2](phase2-timekeeping.md).
 
 > **Code reference:** the per-app and per-package documentation set starts at
 > [`docs/index.md`](index.md). This file stays the project, decision and setup overview.
@@ -272,10 +272,10 @@ A dependency with a build script has no explicit decision in `allowBuilds`. Add 
 
 ## Roadmap
 
-| Phase | Scope                                                                                                                                               | Status                                      |
-| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| **0** | Workspace, API, PostgreSQL, Electron shell, green build                                                                                             | **complete**                                |
-| **1** | Organization, RBAC, workforce/employment history, configuration, audit, outbox, generated schema and UI                                             | implemented; verification in Phase 1 report |
-| **2** | Payroll domain: periods, attendance, earnings, deductions, and SSS / PhilHealth / Pag-IBIG / BIR as versioned reference data with effectivity dates | planned                                     |
-| **3** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                                                            | planned                                     |
-| **4** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups                                                      | planned                                     |
+| Phase | Scope                                                                                                       | Status                                      |
+| ----- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| **0** | Workspace, API, PostgreSQL, Electron shell, green build                                                     | **complete**                                |
+| **1** | Organization, RBAC, workforce/employment history, configuration, audit, outbox, generated schema and UI     | implemented; verification in Phase 1 report |
+| **2** | Timekeeping: schedules, assignments, raw punches/corrections, leave, attendance interpretation and approval | implemented; verification in Phase 2 report |
+| **3** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                    | planned                                     |
+| **4** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups              | planned                                     |

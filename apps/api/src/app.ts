@@ -8,6 +8,7 @@ import { createAuthRouter } from './routes/auth.js';
 import { createAuthService } from './auth/service.js';
 import { pool } from './db/pool.js';
 import { createFoundationRouter } from './foundation/router.js';
+import { createTimekeepingRouter } from './timekeeping/router.js';
 
 export const logger = pino({ level: env.LOG_LEVEL });
 
@@ -45,18 +46,16 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
     error !== null &&
     'type' in error &&
     error.type === 'entity.too.large';
-  res
-    .status(invalid ? 400 : large ? 413 : 500)
-    .json({
-      error: {
-        code: invalid || large ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
-        message: invalid
-          ? 'Malformed JSON'
-          : large
-            ? 'Request is too large'
-            : 'Internal server error',
-      },
-    });
+  res.status(invalid ? 400 : large ? 413 : 500).json({
+    error: {
+      code: invalid || large ? 'INVALID_REQUEST' : 'INTERNAL_ERROR',
+      message: invalid
+        ? 'Malformed JSON'
+        : large
+          ? 'Request is too large'
+          : 'Internal server error',
+    },
+  });
 };
 
 /**
@@ -82,6 +81,7 @@ export function createApp(): Express {
   // Mounted under `/api`, which is where every consumer expects health
   // (`HEALTH_PATH` in @hexpayroll/shared) and where resource routes will live.
   app.use('/api', healthRouter);
+  app.use('/api', createTimekeepingRouter(pool));
   app.use('/api', createFoundationRouter(pool));
 
   app.use(notFound);

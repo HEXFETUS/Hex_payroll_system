@@ -9,6 +9,9 @@ Two layers, deliberately separated:
 
 ## Reference map
 
+Phase 2: [Timekeeping conventions and operations](phase2-timekeeping.md) ·
+[Implementation and verification report](phase2-implementation-report.md).
+
 | Document                                                   | Covers                                                                                                                                |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
 | [`architecture.md`](architecture.md)                       | offline-first topology, one `createApp()` on two hosts, process model and ports, request flow, security boundaries, module boundaries |
@@ -17,7 +20,7 @@ Two layers, deliberately separated:
 | [`authentication.md`](authentication.md)                   | local authentication contracts, migrations, account creation, sessions, and tests                                                     |
 | [`apps/desktop.md`](apps/desktop.md)                       | Electron main + preload surface, dev-vs-packaged UI loading, single-instance guard, electron-builder config                           |
 | [`packages/shared.md`](packages/shared.md)                 | money as integer centavos, allocation without drift, Zod primitives, `HealthStatus` and `HEALTH_PATH`, NodeNext entry-point rules     |
-| [`packages/payroll-engine.md`](packages/payroll-engine.md) | the pure-library contract, exported types, the `netPay` invariants Phase 2 must test                                                  |
+| [`packages/payroll-engine.md`](packages/payroll-engine.md) | the pure-library contract, exported types, the `netPay` invariants reserved for future payroll work                                   |
 | [`database.md`](database.md)                               | the two-role privilege model, provisioning SQL + `provision.ps1`, migration rules, generated schema policy                            |
 | [`development.md`](development.md)                         | workspace build graph, scripts and ports, toolchain pins, conventions, how to add a package                                           |
 | [`troubleshooting.md`](troubleshooting.md)                 | code-level failures you will actually hit                                                                                             |

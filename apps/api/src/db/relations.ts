@@ -16,6 +16,18 @@ import {
   syncOutbox,
   payrollConfigurations,
   syncNodes,
+  workSchedules,
+  workScheduleVersions,
+  workScheduleDays,
+  employeeScheduleAssignments,
+  timeRecords,
+  timeRecordCorrections,
+  leaveTypes,
+  leaveRequests,
+  attendanceRecords,
+  attendanceHistory,
+  attendanceAdjustments,
+  scheduleAssignmentHistory,
 } from './generated/schema.js';
 export const organizationRelations = relations(organizations, ({ many }) => ({
   employees: many(employees),
@@ -34,6 +46,96 @@ export const employeeRelations = relations(employees, ({ one, many }) => ({
   }),
   employment: many(employmentVersions),
   mappings: many(biometricMappings),
+  schedules: many(employeeScheduleAssignments),
+  timeRecords: many(timeRecords),
+  leave: many(leaveRequests),
+  attendance: many(attendanceRecords),
+}));
+export const scheduleRelations = relations(workSchedules, ({ many }) => ({
+  versions: many(workScheduleVersions),
+  assignments: many(employeeScheduleAssignments),
+}));
+export const scheduleVersionRelations = relations(workScheduleVersions, ({ one, many }) => ({
+  schedule: one(workSchedules, {
+    fields: [workScheduleVersions.scheduleId],
+    references: [workSchedules.id],
+  }),
+  days: many(workScheduleDays),
+}));
+export const scheduleDayRelations = relations(workScheduleDays, ({ one }) => ({
+  version: one(workScheduleVersions, {
+    fields: [workScheduleDays.versionId],
+    references: [workScheduleVersions.id],
+  }),
+}));
+export const employeeScheduleRelations = relations(
+  employeeScheduleAssignments,
+  ({ one, many }) => ({
+    employee: one(employees, {
+      fields: [employeeScheduleAssignments.employeeId],
+      references: [employees.id],
+    }),
+    schedule: one(workSchedules, {
+      fields: [employeeScheduleAssignments.scheduleId],
+      references: [workSchedules.id],
+    }),
+    history: many(scheduleAssignmentHistory),
+  }),
+);
+export const scheduleAssignmentHistoryRelations = relations(
+  scheduleAssignmentHistory,
+  ({ one }) => ({
+    assignment: one(employeeScheduleAssignments, {
+      fields: [scheduleAssignmentHistory.assignmentId],
+      references: [employeeScheduleAssignments.id],
+    }),
+  }),
+);
+export const timeRecordRelations = relations(timeRecords, ({ one, many }) => ({
+  employee: one(employees, { fields: [timeRecords.employeeId], references: [employees.id] }),
+  device: one(biometricDevices, {
+    fields: [timeRecords.deviceId],
+    references: [biometricDevices.id],
+  }),
+  corrections: many(timeRecordCorrections),
+}));
+export const timeCorrectionRelations = relations(timeRecordCorrections, ({ one }) => ({
+  record: one(timeRecords, {
+    fields: [timeRecordCorrections.timeRecordId],
+    references: [timeRecords.id],
+  }),
+}));
+export const leaveTypeRelations = relations(leaveTypes, ({ many }) => ({
+  requests: many(leaveRequests),
+}));
+export const leaveRequestRelations = relations(leaveRequests, ({ one }) => ({
+  employee: one(employees, { fields: [leaveRequests.employeeId], references: [employees.id] }),
+  type: one(leaveTypes, { fields: [leaveRequests.leaveTypeId], references: [leaveTypes.id] }),
+}));
+export const attendanceRelations = relations(attendanceRecords, ({ one, many }) => ({
+  employee: one(employees, { fields: [attendanceRecords.employeeId], references: [employees.id] }),
+  assignment: one(employeeScheduleAssignments, {
+    fields: [attendanceRecords.scheduleAssignmentId],
+    references: [employeeScheduleAssignments.id],
+  }),
+  version: one(workScheduleVersions, {
+    fields: [attendanceRecords.scheduleVersionId],
+    references: [workScheduleVersions.id],
+  }),
+  history: many(attendanceHistory),
+  adjustments: many(attendanceAdjustments),
+}));
+export const attendanceHistoryRelations = relations(attendanceHistory, ({ one }) => ({
+  attendance: one(attendanceRecords, {
+    fields: [attendanceHistory.attendanceId],
+    references: [attendanceRecords.id],
+  }),
+}));
+export const attendanceAdjustmentRelations = relations(attendanceAdjustments, ({ one }) => ({
+  attendance: one(attendanceRecords, {
+    fields: [attendanceAdjustments.attendanceId],
+    references: [attendanceRecords.id],
+  }),
 }));
 export const employmentRelations = relations(employmentVersions, ({ one }) => ({
   employee: one(employees, { fields: [employmentVersions.employeeId], references: [employees.id] }),

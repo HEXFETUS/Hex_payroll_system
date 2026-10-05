@@ -1,5 +1,5 @@
+import { authenticate, domainErrors } from '../timekeeping/middleware.js';
 import { Router } from 'express';
-import type { Request, Response, NextFunction } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 import { sql } from 'drizzle-orm';
@@ -20,12 +20,10 @@ import {
   type Permission,
   type FoundationRecord,
 } from '@hexpayroll/shared';
-import { tokenHash } from '../auth/service.js';
 import { hashPassword } from '../auth/password.js';
 import {
   DomainError,
   transaction,
-  getActor,
   requirePermission,
   audit,
   outbox,
@@ -35,7 +33,6 @@ import {
   project,
   lockEmployee,
   sensitiveFields,
-  databaseErrorCode,
   readOrganization,
   type Actor,
 } from './repository.js';
@@ -86,21 +83,7 @@ export function createFoundationRouter(pool: Pool) {
     res.setHeader('Cache-Control', 'no-store');
     next();
   });
-  router.use(async (req, res, next) => {
-    try {
-      const token = /^Bearer ([A-Za-z0-9_-]{43})$/i.exec(req.headers.authorization ?? '')?.[1];
-      if (!token) throw new DomainError(401, 'SESSION_INVALID', 'Sign in required');
-      const found = await pool.query<{ user_id: string }>(
-        'SELECT user_id FROM auth_sessions WHERE token_hash=$1 AND expires_at>now()',
-        [tokenHash(token)],
-      );
-      if (!found.rows[0]) throw new DomainError(401, 'SESSION_INVALID', 'Session invalid');
-      res.locals.actor = await getActor(pool, found.rows[0].user_id);
-      next();
-    } catch (error) {
-      next(error);
-    }
-  });
+  router.use(authenticate(pool));
   const actor = (res: { locals: Record<string, unknown> }) => res.locals.actor as Actor;
   router.get('/organization/setup', async (_req, res) => {
     const result = await pool.query(
@@ -680,10 +663,27 @@ export function createFoundationRouter(pool: Pool) {
       'SELECT count(*)::integer count FROM departments WHERE organization_id=$1',
       [who.organizationId],
     );
+    const attendance = await pool.query(
+      `SELECT count(*)::integer processed,
+      count(*) FILTER(WHERE attendance_status='present')::integer present,
+      count(*) FILTER(WHERE attendance_status='late')::integer late,
+      count(*) FILTER(WHERE attendance_status='absent')::integer absent,
+      count(*) FILTER(WHERE attendance_status='on_leave')::integer on_leave,
+      count(*) FILTER(WHERE attendance_status='incomplete')::integer incomplete,
+      count(*) FILTER(WHERE approval_status='needs_review')::integer stale
+      FROM attendance_records WHERE organization_id=$1 AND work_date=(SELECT (now() AT TIME ZONE timezone)::date FROM organizations WHERE id=$1)`,
+      [who.organizationId],
+    );
+    const pending = await pool.query(
+      'SELECT count(*)::integer pending FROM attendance_processing_jobs WHERE organization_id=$1',
+      [who.organizationId],
+    );
     res.json({
       ...normalize({ ...result.rows[0], id: who.organizationId }),
       departments: departments.rows[0].count,
-      attendanceAvailable: false,
+      attendanceAvailable: true,
+      ...normalize({ id: who.organizationId, ...attendance.rows[0] }),
+      pending: pending.rows[0].pending,
     });
   });
   router.get('/sync/summary', async (_req, res) => {
@@ -710,51 +710,14 @@ export function createFoundationRouter(pool: Pool) {
       databaseVersion: result.rows[0].version,
       biometric: 'unconfigured',
       sync: 'unconfigured',
+      biometricIngestion: (
+        await pool.query(
+          'SELECT d.id,d.name,s.last_ingestion_at,s.last_record_at FROM biometric_devices d LEFT JOIN biometric_ingestion_state s ON s.device_id=d.id WHERE d.organization_id=$1',
+          [actor(res).organizationId],
+        )
+      ).rows.map(normalize),
     });
   });
-  router.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-    if (error instanceof DomainError) {
-      res.status(error.status).json({ error: { code: error.code, message: error.message } });
-      return;
-    }
-    if (error instanceof z.ZodError) {
-      res.status(400).json({
-        error: {
-          code: 'INVALID_REQUEST',
-          message: error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '),
-        },
-      });
-      return;
-    }
-    const code = databaseErrorCode(error);
-    const status =
-      code === '23505'
-        ? 409
-        : ['23503', '23514', '22P02'].includes(code)
-          ? 400
-          : /^(08|53|57P)/.test(code) || ['ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT'].includes(code)
-            ? 503
-            : 500;
-    res.status(status).json({
-      error: {
-        code:
-          status === 409
-            ? 'DUPLICATE'
-            : status === 400
-              ? 'INVALID_REQUEST'
-              : status === 503
-                ? 'SERVICE_UNAVAILABLE'
-                : 'INTERNAL_ERROR',
-        message:
-          status === 409
-            ? 'Identifier already exists'
-            : status === 400
-              ? 'Invalid fields or related records'
-              : status === 503
-                ? 'Local database unavailable'
-                : 'Operation failed',
-      },
-    });
-  });
+  router.use(domainErrors);
   return router;
 }

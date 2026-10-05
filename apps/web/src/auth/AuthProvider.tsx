@@ -31,7 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         (previous.user.organizationId !== value.user.organizationId ||
           JSON.stringify(previous.user.permissions) !== JSON.stringify(value.user.permissions))
       ) {
-        void queryClient.cancelQueries({ queryKey: ['operations'] });
+        void queryClient.cancelQueries({
+          predicate: (query) => ['operations', 'timekeeping'].includes(String(query.queryKey[0])),
+        });
         queryClient.removeQueries({ queryKey: ['operations'] });
       }
       sessionRef.current = value;
@@ -47,7 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setNotice(message);
       const scoped = {
         predicate: (query: { queryKey: readonly unknown[] }) =>
-          query.queryKey[0] === 'auth-session' || query.queryKey[0] === 'operations',
+          query.queryKey[0] === 'auth-session' ||
+          query.queryKey[0] === 'operations' ||
+          query.queryKey[0] === 'timekeeping',
       };
       void queryClient.cancelQueries(scoped);
       queryClient.removeQueries(scoped);

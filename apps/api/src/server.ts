@@ -2,6 +2,7 @@ import { PAYROLL_ENGINE_VERSION } from '@hexpayroll/payroll-engine';
 import { createApp, logger } from './app.js';
 import { env } from './config/env.js';
 import { pool, probeDatabase } from './db/pool.js';
+import { startAttendanceWorker } from './timekeeping/worker.js';
 
 async function main(): Promise<void> {
   // Probe before binding a port. If the database is unreachable we want a clear
@@ -10,6 +11,9 @@ async function main(): Promise<void> {
   logger.info({ database: probe.database, connectedAs: probe.user }, 'postgres reachable');
 
   const app = createApp();
+  const stopWorker = startAttendanceWorker(pool, () =>
+    logger.error('Attendance worker failed; retrying'),
+  );
 
   const server = app.listen(env.API_PORT, env.API_HOST, () => {
     logger.info(
@@ -26,9 +30,11 @@ async function main(): Promise<void> {
   const shutdown = (signal: NodeJS.Signals): void => {
     logger.info({ signal }, 'shutting down');
     server.close(() => {
-      void pool.end().then(() => {
-        process.exit(0);
-      });
+      void stopWorker()
+        .then(() => pool.end())
+        .then(() => {
+          process.exit(0);
+        });
     });
   };
 
