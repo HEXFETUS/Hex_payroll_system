@@ -1,6 +1,16 @@
 import { Link } from 'react-router-dom';
 import { usePermission } from './FoundationPages';
 export const settingsNavigation = [
+  {
+    title: 'Payroll Monetary Policies',
+    path: '/settings/payroll-policies',
+    permission: 'payroll_config.view',
+  },
+  {
+    title: 'Statutory Tables',
+    path: '/settings/statutory-tables',
+    permission: 'contributions.view',
+  },
   { title: 'Organization', path: '/settings/organization', permission: 'organization.view' },
   { title: 'Users', path: '/settings/users', permission: 'users.view' },
   { title: 'Roles & Permissions', path: '/settings/roles', permission: 'roles.view' },
@@ -22,7 +32,8 @@ export const settingsNavigation = [
 ];
 function SettingsLink({ item }: { item: (typeof settingsNavigation)[number] }) {
   const allowed = usePermission(item.permission);
-  return allowed ? (
+  const taxAllowed = usePermission('tax.view');
+  return allowed || (item.path === '/settings/statutory-tables' && taxAllowed) ? (
     <Link className="panel p-5 text-action" to={item.path}>
       {item.title} →
     </Link>

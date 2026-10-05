@@ -5,9 +5,10 @@ Offline-first desktop payroll system for Philippine payroll operations.
 A payroll clerk must be able to keep working when the Internet is unavailable, and
 synchronise later. That single requirement shapes every decision below.
 
-**Current phase: Phase 2 — timekeeping.** Persisted schedules, assignments, punch
-evidence/corrections, leave, attendance processing and approval extend the Phase 1
-foundation. Payroll computation and full sync remain deferred. See [Phase 2](phase2-timekeeping.md).
+**Current phase: Phase 3 — payroll engine.** Payroll periods, historical runs,
+deterministic computations, review, and immutable finalization extend Phase 1/2.
+Production statutory rules await verified imports; full sync remains deferred.
+See [Phase 3 operations](phase3-payroll.md) and its [implementation report](phase3-implementation-report.md).
 
 > **Code reference:** the per-app and per-package documentation set starts at
 > [`docs/index.md`](index.md). This file stays the project, decision and setup overview.
@@ -106,7 +107,7 @@ hexpayrollsys/
 │   └── desktop/      Electron main + preload only. Renderer is apps/web.
 ├── packages/
 │   ├── shared/       Contracts, Zod primitives, money helpers.
-│   └── payroll-engine/  Pure computation core. No I/O. Types only so far.
+│   └── payroll-engine/  Pure computation core. Exact arithmetic and versioned rule inputs.
 ├── database/
 │   ├── migrations/   AUTHORITATIVE immutable SQL schema history.
 │   └── provision/    One-time role/database/privilege bootstrap.
@@ -272,10 +273,11 @@ A dependency with a build script has no explicit decision in `allowBuilds`. Add 
 
 ## Roadmap
 
-| Phase | Scope                                                                                                       | Status                                      |
-| ----- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| **0** | Workspace, API, PostgreSQL, Electron shell, green build                                                     | **complete**                                |
-| **1** | Organization, RBAC, workforce/employment history, configuration, audit, outbox, generated schema and UI     | implemented; verification in Phase 1 report |
-| **2** | Timekeeping: schedules, assignments, raw punches/corrections, leave, attendance interpretation and approval | implemented; verification in Phase 2 report |
-| **3** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                    | planned                                     |
-| **4** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups              | planned                                     |
+| Phase | Scope                                                                                                       | Status                                               |
+| ----- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **0** | Workspace, API, PostgreSQL, Electron shell, green build                                                     | **complete**                                         |
+| **1** | Organization, RBAC, workforce/employment history, configuration, audit, outbox, generated schema and UI     | implemented; verification in Phase 1 report          |
+| **2** | Timekeeping: schedules, assignments, raw punches/corrections, leave, attendance interpretation and approval | implemented; verification in Phase 2 report          |
+| **3** | Payroll engine: periods, computations, snapshots, review, finalization, reference imports                   | implemented; verified statutory data awaiting import |
+| **4** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                    | planned                                              |
+| **5** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups              | planned                                              |

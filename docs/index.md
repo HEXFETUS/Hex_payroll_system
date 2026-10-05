@@ -9,6 +9,9 @@ Two layers, deliberately separated:
 
 ## Reference map
 
+Phase 3: [Payroll operations and contracts](phase3-payroll.md) ·
+[Implementation and verification report](phase3-implementation-report.md).
+
 Phase 2: [Timekeeping conventions and operations](phase2-timekeeping.md) ·
 [Implementation and verification report](phase2-implementation-report.md).
 
@@ -20,7 +23,7 @@ Phase 2: [Timekeeping conventions and operations](phase2-timekeeping.md) ·
 | [`authentication.md`](authentication.md)                   | local authentication contracts, migrations, account creation, sessions, and tests                                                     |
 | [`apps/desktop.md`](apps/desktop.md)                       | Electron main + preload surface, dev-vs-packaged UI loading, single-instance guard, electron-builder config                           |
 | [`packages/shared.md`](packages/shared.md)                 | money as integer centavos, allocation without drift, Zod primitives, `HealthStatus` and `HEALTH_PATH`, NodeNext entry-point rules     |
-| [`packages/payroll-engine.md`](packages/payroll-engine.md) | the pure-library contract, exported types, the `netPay` invariants reserved for future payroll work                                   |
+| [`packages/payroll-engine.md`](packages/payroll-engine.md) | deterministic payroll stages, rational arithmetic, persisted-line reconciliation, and statutory evaluator interfaces                  |
 | [`database.md`](database.md)                               | the two-role privilege model, provisioning SQL + `provision.ps1`, migration rules, generated schema policy                            |
 | [`development.md`](development.md)                         | workspace build graph, scripts and ports, toolchain pins, conventions, how to add a package                                           |
 | [`troubleshooting.md`](troubleshooting.md)                 | code-level failures you will actually hit                                                                                             |
@@ -47,7 +50,7 @@ apps/api        Express + pg + Zod. One createApp(), two hosts.   → docs/apps/
 apps/web        React UI. Electron-agnostic, browser-buildable.   → docs/apps/web.md
 apps/desktop    Electron main + preload only (renderer is web).   → docs/apps/desktop.md
 packages/shared        Contracts, Zod primitives, money helpers.  → docs/packages/shared.md
-packages/payroll-engine Pure computation core. Types only so far. → docs/packages/payroll-engine.md
+packages/payroll-engine Pure payroll computation, exact arithmetic, rule interfaces. → docs/packages/payroll-engine.md
 database/       Provisioning + authoritative migration history.   → docs/database.md
 ```
 

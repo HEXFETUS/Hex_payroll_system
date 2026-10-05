@@ -1,6 +1,21 @@
 import { z } from 'zod';
 import { nonNegativeCentavosSchema, isoDateSchema } from './primitives.js';
+// Kept literal here to avoid a foundation/payroll runtime import cycle.
 export const permissionCodes = [
+  'payroll.view',
+  'payroll.create_period',
+  'payroll.compute',
+  'payroll.recompute',
+  'payroll.review',
+  'payroll.finalize',
+  'earnings.view',
+  'earnings.manage',
+  'deductions.view',
+  'deductions.manage',
+  'contributions.view',
+  'contributions.configure',
+  'tax.view',
+  'tax.configure',
   'dashboard.view',
   'employees.view',
   'employees.create',

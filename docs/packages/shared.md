@@ -31,20 +31,20 @@ represent decimal money exactly (`0.1 + 0.2 !== 0.3`), and in payroll those erro
 across earnings, deductions, contributions and withholding tax until payslips stop
 reconciling.
 
-| Export                                                  | Contract                                                                                                                         |
-| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `Centavos`                                              | `number` alias; 1 peso = 100 centavos                                                                                            |
-| `CENTAVOS_PER_PESO`                                     | `100`                                                                                                                            |
-| `assertCentavos(value, label?)`                         | throws `RangeError` unless `Number.isSafeInteger(value)`                                                                         |
-| `isCentavos(value)`                                     | type guard for the above                                                                                                         |
-| `pesosToCentavos(pesos)`                                | rounds to the nearest centavo; rejects non-finite input                                                                          |
-| `centavosToPesos(centavos)`                             | display/reporting only                                                                                                           |
-| `addCentavos(...)`, `sumCentavos([])`                   | integer-safe addition; the total is re-asserted                                                                                  |
-| `subtractCentavos(a, b)`, `multiplyCentavos(c, factor)` | `multiplyCentavos` rounds to the centavo                                                                                         |
-| `allocateCentavos(total, weights)`                      | largest-remainder split where the parts sum **exactly** to `total`, ties broken by index (deterministic), sign preserved         |
-| `formatPeso(centavos, locale = 'en-PH')`                | `Intl.NumberFormat` currency string, e.g. `123456` → `₱1,234.56`                                                                 |
-| `centavosToDecimalString(centavos)`                     | exact decimal peso string for display/forms, e.g. `123456` → `"1234.56"`; not a centavo database parameter |
-| `decimalStringToCentavos(value)`                        | parses decimal peso form input into integer centavos |
+| Export                                                  | Contract                                                                                                                 |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `Centavos`                                              | `number` alias; 1 peso = 100 centavos                                                                                    |
+| `CENTAVOS_PER_PESO`                                     | `100`                                                                                                                    |
+| `assertCentavos(value, label?)`                         | throws `RangeError` unless `Number.isSafeInteger(value)`                                                                 |
+| `isCentavos(value)`                                     | type guard for the above                                                                                                 |
+| `pesosToCentavos(pesos)`                                | rounds to the nearest centavo; rejects non-finite input                                                                  |
+| `centavosToPesos(centavos)`                             | display/reporting only                                                                                                   |
+| `addCentavos(...)`, `sumCentavos([])`                   | integer-safe addition; the total is re-asserted                                                                          |
+| `subtractCentavos(a, b)`, `multiplyCentavos(c, factor)` | `multiplyCentavos` rounds to the centavo                                                                                 |
+| `allocateCentavos(total, weights)`                      | largest-remainder split where the parts sum **exactly** to `total`, ties broken by index (deterministic), sign preserved |
+| `formatPeso(centavos, locale = 'en-PH')`                | `Intl.NumberFormat` currency string, e.g. `123456` → `₱1,234.56`                                                         |
+| `centavosToDecimalString(centavos)`                     | exact decimal peso string for display/forms, e.g. `123456` → `"1234.56"`; not a centavo database parameter               |
+| `decimalStringToCentavos(value)`                        | parses decimal peso form input into integer centavos                                                                     |
 
 `allocateCentavos` exists because naive per-part rounding silently loses or invents centavos.
 Use it whenever a total is divided — a pay-run pot across days worked, a contribution across

@@ -3,6 +3,14 @@ import { LoginPage } from './pages/LoginPage';
 import { AppLayout } from './layouts/AppLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { AttendancePage } from './pages/AttendancePage';
+import {
+  PayrollPeriodsPage,
+  PayrollReviewPage,
+  EmployeePayrollPage,
+  PayrollEntriesPage,
+  PayrollPolicyPage,
+  StatutoryRulesPage,
+} from './pages/PayrollPages';
 import { SchedulesPage, TimeRecordsPage, LeavePage } from './pages/TimekeepingPages';
 import { SystemHealthPage } from './components/system/SystemHealth';
 import { SettingsPage } from './pages/SettingsPage';
@@ -40,6 +48,64 @@ function AppRoutes() {
         element={session ? <Navigate to="/dashboard" replace /> : <LoginPage />}
       />
       <Route element={session ? <AppLayout /> : <Navigate to="/login" replace />}>
+        <Route path="/payroll" element={<Navigate to="/payroll/periods" replace />} />
+        <Route
+          path="/payroll/periods"
+          element={
+            <Protected permission="payroll.view">
+              <PayrollPeriodsPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/payroll/periods/:periodId"
+          element={
+            <Protected permission="payroll.view">
+              <PayrollReviewPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/payroll/periods/:periodId/runs/:runId"
+          element={
+            <Protected permission="payroll.view">
+              <PayrollReviewPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/payroll/periods/:periodId/results/:resultId"
+          element={
+            <Protected permission="payroll.view">
+              <EmployeePayrollPage />
+            </Protected>
+          }
+        />
+        <Route
+          path="/payroll/earnings"
+          element={
+            <Protected permission="earnings.view">
+              <PayrollEntriesPage kind="earning" />
+            </Protected>
+          }
+        />
+        <Route
+          path="/payroll/deductions"
+          element={
+            <Protected permission="deductions.view">
+              <PayrollEntriesPage kind="deduction" />
+            </Protected>
+          }
+        />
+        <Route
+          path="/settings/payroll-policies"
+          element={
+            <Protected permission="payroll_config.view">
+              <PayrollPolicyPage />
+            </Protected>
+          }
+        />
+        <Route path="/settings/statutory-tables" element={<StatutoryRulesPage />} />
         <Route
           path="/schedules"
           element={

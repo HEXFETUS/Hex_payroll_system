@@ -9,6 +9,7 @@ import { createAuthService } from './auth/service.js';
 import { pool } from './db/pool.js';
 import { createFoundationRouter } from './foundation/router.js';
 import { createTimekeepingRouter } from './timekeeping/router.js';
+import { createPayrollRouter } from './payroll/router.js';
 
 export const logger = pino({ level: env.LOG_LEVEL });
 
@@ -81,6 +82,7 @@ export function createApp(): Express {
   // Mounted under `/api`, which is where every consumer expects health
   // (`HEALTH_PATH` in @hexpayroll/shared) and where resource routes will live.
   app.use('/api', healthRouter);
+  app.use('/api', createPayrollRouter(pool));
   app.use('/api', createTimekeepingRouter(pool));
   app.use('/api', createFoundationRouter(pool));
 

@@ -11,6 +11,7 @@ export async function foundationRequest(
   token: string,
   method = 'GET',
   body?: unknown,
+  timeoutMs = 10000,
 ): Promise<unknown> {
   const response = await fetch(`${API_BASE_URL.replace(/\/$/, '')}/api/${path}`, {
     method,
@@ -20,7 +21,7 @@ export async function foundationRequest(
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(timeoutMs),
     cache: 'no-store',
     credentials: 'omit',
   });

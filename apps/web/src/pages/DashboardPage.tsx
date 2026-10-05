@@ -7,6 +7,7 @@ import { MetricCard } from '../components/dashboard/MetricCard';
 import { AttendanceTable } from '../components/attendance/AttendanceTable';
 import { SystemHealthWidget } from '../components/system/SystemHealth';
 import { useAuth } from '../auth/AuthProvider';
+import { PayrollDashboard } from './PayrollPages';
 
 export function DashboardPage() {
   const { session } = useAuth();
@@ -29,6 +30,7 @@ export function DashboardPage() {
     !summary.isError && summary.data?.kind === 'available' ? summary.data.data : undefined;
   return (
     <div className="space-y-6">
+      <PayrollDashboard />
       <div>
         <p className="text-sm text-slate-600">Your local payroll workstation at a glance.</p>
         <p className="mt-1 text-xs text-slate-500">

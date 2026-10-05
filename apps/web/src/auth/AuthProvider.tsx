@@ -32,9 +32,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           JSON.stringify(previous.user.permissions) !== JSON.stringify(value.user.permissions))
       ) {
         void queryClient.cancelQueries({
-          predicate: (query) => ['operations', 'timekeeping'].includes(String(query.queryKey[0])),
+          predicate: (query) =>
+            ['operations', 'timekeeping', 'payroll'].includes(String(query.queryKey[0])),
         });
         queryClient.removeQueries({ queryKey: ['operations'] });
+        queryClient.removeQueries({ queryKey: ['payroll'] });
       }
       sessionRef.current = value;
       setNotice(undefined);
@@ -51,6 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         predicate: (query: { queryKey: readonly unknown[] }) =>
           query.queryKey[0] === 'auth-session' ||
           query.queryKey[0] === 'operations' ||
+          query.queryKey[0] === 'payroll' ||
           query.queryKey[0] === 'timekeeping',
       };
       void queryClient.cancelQueries(scoped);
