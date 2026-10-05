@@ -7,3 +7,5 @@ coverage
 pnpm-lock.yaml
 database/migrations
 *.tsbuildinfo
+# Machine-generated database schema; generated only by schema:pull.
+apps/api/src/db/generated/

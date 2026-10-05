@@ -7,10 +7,7 @@ async function main(): Promise<void> {
   // Probe before binding a port. If the database is unreachable we want a clear
   // startup failure, not an API that accepts requests it cannot serve.
   const probe = await probeDatabase();
-  logger.info(
-    { database: probe.database, connectedAs: probe.user },
-    'postgres reachable',
-  );
+  logger.info({ database: probe.database, connectedAs: probe.user }, 'postgres reachable');
 
   const app = createApp();
 
@@ -40,6 +37,9 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  logger.error({ err: error }, 'fatal error during startup');
+  logger.error(
+    { errorType: error instanceof Error ? error.name : 'unknown' },
+    'fatal error during startup',
+  );
   process.exit(1);
 });

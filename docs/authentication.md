@@ -73,17 +73,25 @@ AuthProvider holds the session in memory. No token or password is stored in
 localStorage, sessionStorage, cookies, or files. Remember me is disabled with an
 explanation.
 
-Successful login navigates to the protected `#/app` confirmation page.
+Successful login navigates to the protected `#/dashboard` page.
 Unauthenticated access redirects to `#/login`; authenticated access to login
-redirects to app. Session verification runs on app entry and every minute, even
+redirects to dashboard. The legacy `#/app` URL redirects to dashboard. Session verification runs on shell entry and every minute, even
 when Internet connectivity reports offline. Known expiry or a 401 clears the
 session. Local-service outages show retry feedback without being treated as
 invalid credentials. Sign Out clears local state immediately and attempts server
 revocation; failures show a notice explaining the abandoned session's expiry.
+Logout and confirmed invalidity cancel and remove session-scoped queries, including
+operational data, while retaining the public local-health query.
 
 Restarting/reloading the renderer requires sign-in again. Password recovery,
-payroll modules, authorization roles, central identity synchronization, and
+payroll calculations, authorization roles, central identity synchronization, and
 persistent sessions are not implemented.
+
+The authenticated shell provides Dashboard, Employee Attendance, System Health,
+Settings, and User Management preview routes. All authenticated accounts can access
+these pages; no administrator authorization is claimed. User listing and creation
+remain unconnected, and the create-user form cannot submit or persist passwords.
+Continue using the interactive CLI for account provisioning.
 
 Development browser and Electron flows use the HTTP renderer. Packaged file-origin
 requests remain blocked by the existing CORS boundary. Production Electron origin

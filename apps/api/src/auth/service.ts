@@ -1,4 +1,4 @@
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import type { Pool } from 'pg';
 import {
   createUserSchema,
@@ -10,6 +10,7 @@ import {
   type SessionResponse,
 } from '@hexpayroll/shared';
 import { DUMMY_PASSWORD_HASH, hashPassword, verifyPassword } from './password.js';
+import { transaction, getActor, audit } from '../foundation/repository.js';
 interface UserRow {
   id: string;
   username: string;
@@ -34,11 +35,19 @@ export function createAuthService(database: Pool) {
     async createUser(input: CreateUserInput): Promise<PublicUser> {
       const parsed = createUserSchema.parse(input);
       const hash = await hashPassword(parsed.password);
-      const result = await database.query<UserRow>(
-        'INSERT INTO auth_users (id, username, email, display_name, password_hash) VALUES ($1,$2,$3,$4,$5) RETURNING id, username, email, display_name',
-        [randomUUID(), parsed.username, parsed.email ?? null, parsed.displayName, hash],
-      );
-      return publicUser(result.rows[0]!);
+      return transaction(database, async (client) => {
+        const result = await client.query<UserRow>(
+          'INSERT INTO auth_users (username, email, display_name, password_hash,organization_id) VALUES ($1,$2,$3,$4,(SELECT organization_id FROM application_setup WHERE singleton)) RETURNING id, username, email, display_name',
+          [parsed.username, parsed.email ?? null, parsed.displayName, hash],
+        );
+        const row = result.rows[0]!;
+        await client.query("INSERT INTO user_roles SELECT $1,id FROM roles WHERE code='viewer'", [
+          row.id,
+        ]);
+        const actor = await getActor(client, row.id);
+        await audit(client, actor, 'CREATE', 'auth_users', row.id, ['username', 'displayName']);
+        return publicUser(row);
+      });
     },
     async login(input: LoginRequest): Promise<LoginResponse | null> {
       const column = input.identifier.includes('@') ? 'email' : 'username';
@@ -51,16 +60,26 @@ export function createAuthService(database: Pool) {
       if (!row || !valid || !row.active) return null;
       const accessToken = randomBytes(32).toString('base64url');
       // Recheck activation before inserting; protected requests also check activation.
-      const result = await database.query<{ expires_at: Date }>(
-        "INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at) SELECT $1, id, now(), now() + ($3 * interval '1 millisecond') FROM auth_users WHERE id=$2 AND active RETURNING expires_at",
-        [tokenHash(accessToken), row.id, SESSION_LIFETIME_MS],
-      );
-      if (!result.rows[0]) return null;
-      return {
-        user: publicUser(row),
-        accessToken,
-        expiresAt: result.rows[0].expires_at.toISOString(),
-      };
+      return transaction(database, async (client) => {
+        const result = await client.query<{ expires_at: Date }>(
+          "INSERT INTO auth_sessions (token_hash, user_id, created_at, expires_at) SELECT $1, id, now(), now() + ($3 * interval '1 millisecond') FROM auth_users WHERE id=$2 AND active RETURNING expires_at",
+          [tokenHash(accessToken), row.id, SESSION_LIFETIME_MS],
+        );
+        if (!result.rows[0]) return null;
+        await client.query('UPDATE auth_users SET last_login_at=now() WHERE id=$1', [row.id]);
+        const actor = await getActor(client, row.id);
+        await audit(client, actor, 'LOGIN', 'auth_users', row.id);
+        return {
+          user: {
+            ...publicUser(row),
+            organizationId: actor.organizationId,
+            roles: actor.roles,
+            permissions: actor.permissions,
+          },
+          accessToken,
+          expiresAt: result.rows[0].expires_at.toISOString(),
+        };
+      });
     },
     async session(token: string): Promise<SessionResponse | null> {
       const result = await database.query<UserRow & { expires_at: Date }>(
@@ -68,10 +87,29 @@ export function createAuthService(database: Pool) {
         [tokenHash(token)],
       );
       const row = result.rows[0];
-      return row ? { user: publicUser(row), expiresAt: row.expires_at.toISOString() } : null;
+      if (!row) return null;
+      const actor = await getActor(database, row.id);
+      return {
+        user: {
+          ...publicUser(row),
+          organizationId: actor.organizationId,
+          roles: actor.roles,
+          permissions: actor.permissions,
+        },
+        expiresAt: row.expires_at.toISOString(),
+      };
     },
     async logout(token: string): Promise<void> {
-      await database.query('DELETE FROM auth_sessions WHERE token_hash=$1', [tokenHash(token)]);
+      await transaction(database, async (client) => {
+        const session = await client.query<{ user_id: string }>(
+          'DELETE FROM auth_sessions WHERE token_hash=$1 RETURNING user_id',
+          [tokenHash(token)],
+        );
+        if (session.rows[0]) {
+          const actor = await getActor(client, session.rows[0].user_id);
+          await audit(client, actor, 'LOGOUT', 'auth_users', actor.id);
+        }
+      });
     },
   };
 }

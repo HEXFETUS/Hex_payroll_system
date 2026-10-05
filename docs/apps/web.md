@@ -9,7 +9,7 @@ TypeScript, Vite 7, Tailwind 4, React Router 7, and TanStack Query 5.
 - `pnpm dev` starts those services plus the Electron shell.
 - `pnpm build` builds all workspace packages; `pnpm typecheck` and `pnpm lint` check them.
 - `HashRouter` keeps the same routing under HTTP and Electron's `file://` build.
-  Login is `#/login`; the protected confirmation page is `#/app`. Root and unknown
+  Login is `#/login`; the protected entry page is `#/dashboard`. Root, legacy `#/app`, and unknown
   routes redirect according to authentication state with history replacement.
 - Vite retains `base: './'` for relative production assets. No Electron APIs are used
   by the renderer. The existing loopback-only Content Security Policy remains unchanged.
@@ -38,12 +38,12 @@ failure, invalid request, or throttling. Thrown errors show generic feedback.
 
 The default adapter calls the local authentication API and validates its responses
 using shared Zod contracts. AuthProvider holds the session token and public user in
-memory; successful login opens the protected confirmation page. Sessions expire
+memory; successful login opens Dashboard inside the protected application shell. Sessions expire
 after eight hours and are verified on page entry and every minute, with local-service
 outages handled separately from invalid sessions. Remember me is disabled; credentials
 and tokens are never logged or persisted. Reloading requires sign-in again.
 Forgot password? reveals guidance to contact an administrator; no recovery route
-or backend flow is invented. No dashboard or payroll modules are implemented.
+or backend flow is invented. Payroll calculations are not implemented.
 
 See [local authentication](../authentication.md) for setup commands, account creation,
 HTTP contracts, logout behavior, and test-database configuration.
@@ -54,13 +54,43 @@ HTTP contracts, logout behavior, and test-database configuration.
 `http://127.0.0.1:4311`. Vite environment values are build-time configuration;
 future runtime port injection is not implemented by this UI task.
 
-`LocalServiceStatus` polls the shared `/api/health` path every five seconds with a
-four-second timeout, no retries, and `networkMode: 'always'`. HTTP success must contain
-`status: 'ok'`, `database: 'reachable'`, and a valid timestamp. Non-success, malformed,
-timed-out, and failed requests show local service unavailable, even if an older
-successful response remains cached. Raw backend errors and database details are hidden.
+`SystemHealthProvider` owns one shared `/api/health` query and polling timer for
+login, shell, dashboard, and System Health. It polls every five seconds with a
+four-second timeout, no retries, and `networkMode: 'always'`. Shared Zod contracts
+validate both HTTP 200 readiness and HTTP 503 database failures. A valid 503 means
+the API is running but the database is disconnected. Malformed, timed-out, and
+failed requests show API unavailable and database unknown, even if older successful
+data is cached. Probe errors are sanitized server-side; credentials are not exposed.
 
-Status labels are Checking local system, Local system ready, and Local payroll service
-unavailable. Local readiness is independent of authentication and Internet availability.
+Local readiness is independent of authentication and Internet availability.
 Internet status never disables Sign In or pauses local health requests. Synchronization
 states remain unimplemented until a real sync engine provides them.
+
+## Authenticated pages
+
+Routes: `#/dashboard`, `#/attendance`, `#/system-health`, `#/settings`, and
+`#/settings/users`. `AppLayout` provides grouped navigation, account/logout controls,
+page titles, session verification, and a shared status footer. Navigation collapses
+on smaller screens; tables scroll horizontally and controls support keyboard focus.
+
+Dashboard contains employee/attendance metrics, an attendance summary, recent records,
+and System Health. `src/api/operations.ts` centralizes typed future-integration
+boundaries. These return explicit unavailable results, not fake records or zero
+counts. `DataState` handles loading, failure/retry, and integration-pending results;
+tables handle genuine empty and populated results when integration becomes available.
+Attendance keeps date, employee, and status filters locally and passes them to its
+adapter. Dates and displayed timestamps use `Asia/Manila`; hours worked must come
+from the backend.
+
+System Health displays database version and last-check information when provided,
+with manual refresh. Biometric status is Not configured, and synchronization is Not
+implemented. Network status comes from `navigator.onLine` and browser events; it
+does not verify Internet reachability or block local operations.
+
+Settings links to User Management and System Health; configuration sections are
+future functionality. User Management is a preview: listing and creation APIs and
+application roles do not exist. The modal uses shared username/password validation,
+local password-confirmation validation, native dialog focus handling and Escape
+support. Password fields are discarded on close/unmount. Creation and role selection
+are disabled; status is a draft only. Nothing is persisted, and no user-management
+authorization or database migrations were added.

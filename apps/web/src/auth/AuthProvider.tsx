@@ -1,6 +1,15 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { LoginResponse } from '@hexpayroll/shared';
 import { revokeSession } from './authentication';
+import { useQueryClient } from '@tanstack/react-query';
 interface AuthContextValue {
   session: LoginResponse | null;
   notice: string | undefined;
@@ -10,12 +19,46 @@ interface AuthContextValue {
 }
 const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<LoginResponse | null>(null);
   const [notice, setNotice] = useState<string>();
-  const clearSession = useCallback((message?: string) => {
-    setSession(null);
-    setNotice(message);
-  }, []);
+  const sessionRef = useRef<LoginResponse | null>(null);
+  const acceptSession = useCallback(
+    (value: LoginResponse) => {
+      const previous = sessionRef.current;
+      if (
+        previous &&
+        (previous.user.organizationId !== value.user.organizationId ||
+          JSON.stringify(previous.user.permissions) !== JSON.stringify(value.user.permissions))
+      ) {
+        void queryClient.cancelQueries({ queryKey: ['operations'] });
+        queryClient.removeQueries({ queryKey: ['operations'] });
+      }
+      sessionRef.current = value;
+      setNotice(undefined);
+      setSession(value);
+    },
+    [queryClient],
+  );
+  const clearSession = useCallback(
+    (message?: string) => {
+      setSession(null);
+      sessionRef.current = null;
+      setNotice(message);
+      const scoped = {
+        predicate: (query: { queryKey: readonly unknown[] }) =>
+          query.queryKey[0] === 'auth-session' || query.queryKey[0] === 'operations',
+      };
+      void queryClient.cancelQueries(scoped);
+      queryClient.removeQueries(scoped);
+    },
+    [queryClient],
+  );
+  useEffect(() => {
+    const invalid = () => clearSession('Your session is no longer valid. Please sign in again.');
+    window.addEventListener('hex-session-invalid', invalid);
+    return () => window.removeEventListener('hex-session-invalid', invalid);
+  }, [clearSession]);
   useEffect(() => {
     if (!session) return;
     const remaining = Date.parse(session.expiresAt) - Date.now();
@@ -47,10 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         notice,
-        acceptSession: (value) => {
-          setNotice(undefined);
-          setSession(value);
-        },
+        acceptSession,
         clearSession,
         signOut,
       }}

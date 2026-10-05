@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { permissionSchema } from './foundation.js';
 export const AUTH_PATHS = {
   login: '/api/auth/login',
   session: '/api/auth/session',
@@ -34,6 +35,9 @@ export const publicUserSchema = z
     username: usernameSchema,
     email: z.email().optional(),
     displayName: z.string().min(1).max(128),
+    organizationId: z.uuid().nullable().optional(),
+    roles: z.array(z.string()).optional(),
+    permissions: z.array(permissionSchema).optional(),
   })
   .strict();
 export const sessionResponseSchema = z
