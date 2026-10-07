@@ -4,7 +4,11 @@ This package contains the compiled API, shared contracts, payroll engine, and a
 production-only pnpm workspace/lockfile. It contains no installed dependencies,
 desktop application, frontend, real environment file, development source, tests,
 or migration tooling. PostgreSQL migrations through 0031 must already be applied
-and verified separately. This runtime package does not apply migrations.
+and verified separately. This runtime package does not apply migrations. The only
+shipped CLIs are the explicitly selected central bootstrap and node management
+commands. See [bootstrap](central-bootstrap.md) and [enrollment](central-enrollment.md).
+They require separate temporary database connections; the running API
+continues using the sync-only runtime role.
 
 ## Linux installation
 
@@ -49,8 +53,10 @@ constraints, runtime grants, node permissions, or the transport protocol.
 
 Run enrollment/push/pull tests against disposable data before enabling actual
 desktop installations. Devices must share the correct organization UUID; Phase
-4A does not bootstrap organizations or replicate business tables. A delivered
-event is a transport receipt only.
+4A transport does not replicate business tables. A delivered event is a transport
+receipt only. The separate central bootstrap command can establish the canonical
+local organization UUID; see the repository's docs/central-bootstrap.md for its
+privilege boundary and the remaining enrollment prerequisite.
 
 After initial verification, configure a persistent service and an HTTPS reverse
 proxy. Keep ports 4311 and 5433 private. The service's working directory must be

@@ -6,7 +6,9 @@
   "description": "Hex Payroll HTTP API. Built as a single deployable so it can run both as the desktop's private local server and as the central server.",
   "main": "./dist/server.js",
   "scripts": {
-    "start": "node dist/server.js"
+    "start": "node dist/server.js",
+    "central:bootstrap": "node dist/cli/central-bootstrap.js",
+    "central:node": "node dist/cli/central-node.js"
   },
   "dependencies": {
     "@hexpayroll/payroll-engine": "workspace:*",

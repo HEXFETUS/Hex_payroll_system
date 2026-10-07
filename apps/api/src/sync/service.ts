@@ -29,7 +29,11 @@ async function lockedNode(c: PoolClient, token: string) {
   await c.query('UPDATE sync_nodes SET last_seen_at=now() WHERE id=$1', [node.id]);
   return node;
 }
-export async function registerNode(pool: Pool, organizationId: string, deviceName: string) {
+export async function registerNode(
+  pool: Pool | PoolClient,
+  organizationId: string,
+  deviceName: string,
+) {
   const token = randomBytes(32).toString('base64url');
   const result = await pool.query<{ id: string }>(
     'INSERT INTO sync_nodes(organization_id,device_name,token_hash) VALUES($1,$2,$3) RETURNING id',

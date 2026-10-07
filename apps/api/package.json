@@ -14,6 +14,9 @@
     "schema:pull": "tsx src/cli/schema-pull.ts",
     "sync:enroll": "tsx src/cli/sync-enroll.ts",
     "auth:bootstrap-admin": "tsx src/cli/bootstrap-admin.ts",
+    "central:bootstrap": "node dist/cli/central-bootstrap.js",
+    "central:node": "node dist/cli/central-node.js",
+    "sync:import": "tsx src/cli/sync-import.ts",
     "auth:create-user": "tsx src/cli/create-user.ts",
     "test": "tsx --test test/*.test.ts",
     "test:local": "tsx src/cli/test-local.ts"

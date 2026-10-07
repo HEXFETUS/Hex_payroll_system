@@ -4,6 +4,7 @@ import { env } from './config/env.js';
 import { pool, probeDatabase } from './db/pool.js';
 import { startAttendanceWorker } from './timekeeping/worker.js';
 import { startSyncWorker } from './sync/client.js';
+import { startLocalAttendanceWorker } from './sync/worker-mode.js';
 
 async function main(): Promise<void> {
   // Probe before binding a port. If the database is unreachable we want a clear
@@ -21,8 +22,8 @@ async function main(): Promise<void> {
           () => logger.warn('Synchronization unavailable; local operations continue'),
         )
       : async () => {};
-  const stopWorker = startAttendanceWorker(pool, () =>
-    logger.error('Attendance worker failed; retrying'),
+  const stopWorker = startLocalAttendanceWorker(env.SYNC_MODE, () =>
+    startAttendanceWorker(pool, () => logger.error('Attendance worker failed; retrying')),
   );
 
   const server = app.listen(env.API_PORT, env.API_HOST, () => {

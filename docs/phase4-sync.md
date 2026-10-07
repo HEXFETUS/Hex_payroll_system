@@ -60,6 +60,11 @@ URLs are rejected. Redirects are rejected so credentials cannot follow a redirec
 
 ## Protocol
 
+For a restricted sync-only central runtime, use
+[central administrative enrollment and local credential import](central-enrollment.md)
+instead of the legacy administrator-session enrollment above. That path leaves
+transport disabled until explicitly enabled, and needs no runtime auth-table grants.
+
 All responses use `Cache-Control: no-store`. JSON request bodies are bounded to
 1 MiB. Each push/pull page contains at most three events; events retain the
 256 KiB database payload bound. Unsupported payload versions are rejected.
