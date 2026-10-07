@@ -2,6 +2,9 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# Require an explicit install rather than changing dependencies during builds.
+verifyDepsBeforeRun: error
+
 # pnpm >= 10 blocks dependency postinstall scripts by default, as a supply-chain
 # protection. pnpm 11 expresses that decision with `allowBuilds` (a map of
 # package name -> boolean). Packages not listed here are skipped, and pnpm then
