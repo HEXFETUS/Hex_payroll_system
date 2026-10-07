@@ -100,6 +100,9 @@ export const organizationInputSchema = z
     status: statusSchema.default('active'),
   })
   .strict();
+export const organizationSetupSchema = organizationInputSchema.extend({
+  id: z.uuid().optional(),
+});
 export const departmentInputSchema = z
   .object({
     code: text,

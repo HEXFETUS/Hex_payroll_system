@@ -1,0 +1,21 @@
+{
+  "name": "@hexpayroll/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Hex Payroll HTTP API. Built as a single deployable so it can run both as the desktop's private local server and as the central server.",
+  "main": "./dist/server.js",
+  "scripts": {
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hexpayroll/payroll-engine": "workspace:*",
+    "@hexpayroll/shared": "workspace:*",
+    "dotenv": "18.0.4",
+    "drizzle-orm": "0.45.3",
+    "express": "5.2.1",
+    "pg": "8.23.0",
+    "pino": "10.3.1",
+    "zod": "4.6.5"
+  }
+}

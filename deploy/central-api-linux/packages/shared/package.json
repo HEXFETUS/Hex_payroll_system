@@ -1,0 +1,21 @@
+{
+  "name": "@hexpayroll/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared contracts, validation primitives and money helpers used by the API, the web app and the desktop shell.",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {},
+  "dependencies": {
+    "zod": "4.6.5"
+  }
+}

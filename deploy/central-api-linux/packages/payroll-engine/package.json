@@ -1,0 +1,21 @@
+{
+  "name": "@hexpayroll/payroll-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Pure, dependency-light payroll computation core. Runs identically on the desktop and on the central server. No I/O, no database access.",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {},
+  "dependencies": {
+    "@hexpayroll/shared": "workspace:*"
+  }
+}

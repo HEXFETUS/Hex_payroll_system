@@ -6,6 +6,7 @@ import { sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import {
   organizationInputSchema,
+  organizationSetupSchema,
   departmentInputSchema,
   positionInputSchema,
   employeeInputSchema,
@@ -100,7 +101,14 @@ export function createFoundationRouter(
   router.post('/organization/setup', async (req, res) => {
     const who = actor(res);
     requirePermission(who, 'organization.update');
-    const input = organizationInputSchema.parse(req.body);
+    const input = organizationSetupSchema.parse(req.body);
+    const { id, ...organizationInput } = input;
+    if (id && syncConfig.mode !== 'central')
+      throw new DomainError(
+        400,
+        'INVALID_REQUEST',
+        'Explicit organization ID is only allowed during central setup',
+      );
     const organization = await transaction(pool, async (client) => {
       const setup = await client.query<{
         organization_id: string | null;
@@ -110,7 +118,11 @@ export function createFoundationRouter(
         throw new DomainError(409, 'CONFLICT', 'Company already configured');
       if (setup.rows[0]?.administrator_id !== who.id)
         throw new DomainError(403, 'FORBIDDEN', 'Bootstrap administrator must complete setup');
-      const row = await insert(client, 'organizations', { ...input, updatedBy: who.id });
+      const row = await insert(client, 'organizations', {
+        ...organizationInput,
+        ...(id ? { id } : {}),
+        updatedBy: who.id,
+      });
       await client.query('UPDATE application_setup SET organization_id=$1 WHERE singleton', [
         row.id,
       ]);
@@ -126,7 +138,7 @@ export function createFoundationRouter(
         'CREATE',
         'organizations',
         row.id,
-        Object.keys(input),
+        Object.keys(organizationInput),
       );
       await outbox(client, 'organizations', row, 'CREATE');
       return row;
