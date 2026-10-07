@@ -77,7 +77,10 @@ async function protectAdministrator(client: PoolClient) {
   if (!result.rowCount)
     throw new DomainError(409, 'CONFLICT', 'At least one active Administrator is required');
 }
-export function createFoundationRouter(pool: Pool) {
+export function createFoundationRouter(
+  pool: Pool,
+  syncConfig: { mode: string; nodeId?: string } = { mode: 'disabled' },
+) {
   const router = Router();
   router.use((_req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
@@ -694,8 +697,29 @@ export function createFoundationRouter(pool: Pool) {
       [who.organizationId],
     );
     res.json({
-      configured: false,
-      nodeProvisioned: false,
+      configured: syncConfig.mode !== 'disabled',
+      mode: syncConfig.mode,
+      nodeProvisioned: Boolean(
+        syncConfig.nodeId &&
+        (
+          await pool.query(
+            'SELECT 1 FROM sync_nodes WHERE id=$1 AND organization_id=$2 AND enabled AND token_hash IS NOT NULL',
+            [syncConfig.nodeId, who.organizationId],
+          )
+        ).rowCount,
+      ),
+      awaitingApplication: (
+        await pool.query(
+          'SELECT count(*)::integer count FROM sync_inbox WHERE organization_id=$1 AND applied_at IS NULL',
+          [who.organizationId],
+        )
+      ).rows[0].count,
+      conflicts: (
+        await pool.query(
+          "SELECT count(*)::integer count FROM sync_conflicts WHERE organization_id=$1 AND status='open'",
+          [who.organizationId],
+        )
+      ).rows[0].count,
       pending: 0,
       processing: 0,
       synced: 0,
@@ -709,7 +733,7 @@ export function createFoundationRouter(pool: Pool) {
     res.json({
       databaseVersion: result.rows[0].version,
       biometric: 'unconfigured',
-      sync: 'unconfigured',
+      sync: syncConfig.mode,
       biometricIngestion: (
         await pool.query(
           'SELECT d.id,d.name,s.last_ingestion_at,s.last_record_at FROM biometric_devices d LEFT JOIN biometric_ingestion_state s ON s.device_id=d.id WHERE d.organization_id=$1',

@@ -5,9 +5,10 @@ Offline-first desktop payroll system for Philippine payroll operations.
 A payroll clerk must be able to keep working when the Internet is unavailable, and
 synchronise later. That single requirement shapes every decision below.
 
-**Current phase: Phase 3 — payroll engine.** Payroll periods, historical runs,
+**Current phase: Phase 4A — sync transport.** See [transport setup and limits](phase4-sync.md).
+Payroll periods, historical runs,
 deterministic computations, review, and immutable finalization extend Phase 1/2.
-Production statutory rules await verified imports; full sync remains deferred.
+Production statutory rules await verified imports; business-table replication remains deferred.
 See [Phase 3 operations](phase3-payroll.md) and its [implementation report](phase3-implementation-report.md).
 
 > **Code reference:** the per-app and per-package documentation set starts at
@@ -279,5 +280,5 @@ A dependency with a build script has no explicit decision in `allowBuilds`. Add 
 | **1** | Organization, RBAC, workforce/employment history, configuration, audit, outbox, generated schema and UI     | implemented; verification in Phase 1 report          |
 | **2** | Timekeeping: schedules, assignments, raw punches/corrections, leave, attendance interpretation and approval | implemented; verification in Phase 2 report          |
 | **3** | Payroll engine: periods, computations, snapshots, review, finalization, reference imports                   | implemented; verified statutory data awaiting import |
-| **4** | Offline sync: outbox queue, revision-based concurrency, node identity, conflict handling                    | planned                                              |
+| **4** | Offline sync: authenticated transport, durable delivery/pull, retries and transport conflicts               | Phase 4A implemented; business replication deferred  |
 | **5** | Packaging: bundled private PostgreSQL cluster, NSIS installer, code signing, automated backups              | planned                                              |

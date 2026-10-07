@@ -1379,10 +1379,17 @@ export function SyncPage() {
   return (
     <div className="space-y-5">
       <p className="notice">
-        Sync engine not configured. Local operations remain available without Internet. Node
-        provisioning and synchronization transport belong to Phase 3.
+        {data?.configured
+          ? 'Sync transport is configured. Delivered events are stored durably; business records are not yet replicated.'
+          : 'Sync transport is disabled. Local operations remain available without Internet.'}
       </p>
       <QueryNotice pending={query.isPending} error={query.error} />
+      {data && (
+        <p className="text-sm text-slate-500">
+          Delivered: {String(data.synced)}. Awaiting business application:{' '}
+          {String(data.awaitingApplication)}. Open transport conflicts: {String(data.conflicts)}.
+        </p>
+      )}
       {data && (
         <div className="grid gap-4 sm:grid-cols-4">
           {['pending', 'processing', 'synced', 'failed'].map((k) => (

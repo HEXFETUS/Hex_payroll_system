@@ -18,3 +18,4 @@ export * from './auth.js';
 export * from './foundation.js';
 export * from './timekeeping.js';
 export * from './payroll.js';
+export * from './sync.js';

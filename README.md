@@ -4,10 +4,11 @@ Offline-first desktop payroll system for Philippine payroll operations — Elect
 Express + PostgreSQL 18. A payroll clerk must be able to keep working when the Internet is
 unavailable, and synchronise later.
 
-**Current phase: Phase 1 — core foundation.** Company setup, persisted workforce and
+**Current phase: Phase 4A — sync transport.** See [transport setup and limits](docs/phase4-sync.md).
+Company setup, persisted workforce and
 employment history, permissions, configuration, audit, and an atomic offline outbox are
-connected through PostgreSQL, Express, shared contracts, and React. Payroll calculation
-and the sync engine remain deferred. See [Phase 1 setup and architecture](docs/phase1-foundation.md).
+connected through PostgreSQL, Express, shared contracts, and React. Payroll calculations
+and durable sync transport are implemented; business-table replication remains deferred.
 
 ## Documentation
 

@@ -12,6 +12,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "migrate": "tsx src/cli/migrate.ts",
     "schema:pull": "tsx src/cli/schema-pull.ts",
+    "sync:enroll": "tsx src/cli/sync-enroll.ts",
     "auth:bootstrap-admin": "tsx src/cli/bootstrap-admin.ts",
     "auth:create-user": "tsx src/cli/create-user.ts",
     "test": "tsx --test test/*.test.ts",
