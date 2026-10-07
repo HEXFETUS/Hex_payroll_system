@@ -6,7 +6,7 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev --watch",
-    "build": "electron-vite build",
+    "build": "electron-vite build --ignoreConfigWarning",
     "preview": "electron-vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "package": "electron-builder --config electron-builder.yml"

@@ -19,5 +19,27 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
+    rollupOptions: {
+      onwarn(warning, warn) {
+        // Zod's prose comments mention @__PURE__ without annotating a call.
+        // Rollup already discards these comments; retain every other warning.
+        const id = warning.id?.replaceAll('\\', '/');
+        if (
+          warning.code === 'INVALID_ANNOTATION' &&
+          id?.includes('/node_modules/') &&
+          /\/zod\/v4\/core\/(regexes|util)\.js$/.test(id)
+        )
+          return;
+        warn(warning);
+      },
+      output: {
+        manualChunks(id) {
+          const moduleId = id.replaceAll('\\', '/');
+          if (!moduleId.includes('/node_modules/')) return;
+          if (moduleId.includes('/zod/')) return 'validation';
+          if (/\/(react|react-dom|scheduler)\//.test(moduleId)) return 'react';
+        },
+      },
+    },
   },
 });
