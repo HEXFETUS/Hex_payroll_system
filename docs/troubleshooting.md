@@ -57,14 +57,18 @@ alone. Note that the passwords committed in `01_create_roles_and_database.sql` a
 
 ## `Cannot find module '@hexpayroll/shared'` (or `@hexpayroll/payroll-engine`)
 
-Apps resolve those packages through their built `dist/` directory, so the packages have to be
-built first:
+Apps resolve those packages through their built `dist/` directory. Missing output can also
+produce Vite's `Failed to resolve entry for package "@hexpayroll/shared"` error.
+Root `dev` / `dev:browser` and direct web/API `dev` scripts build dependencies automatically.
+For manual recovery, run from the repository root:
 
 ```powershell
-pnpm build          # or: pnpm typecheck   (builds packages/* before type-checking apps)
+pnpm build:packages
+# For the web app alone: pnpm --filter @hexpayroll/shared build
 ```
 
-Fresh clones hit this because `dist/` is gitignored. See
+Restart the development server afterward. Fresh clones lack this output because `dist/`
+is gitignored. If the build fails, resolve that error before restarting. See
 [`development.md`](development.md#workspace-and-build-graph).
 
 ## `Cannot find module './App'`, or "extension is not allowed" style errors

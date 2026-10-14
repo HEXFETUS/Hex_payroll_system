@@ -18,8 +18,12 @@ packages/shared ─┬───────────────────�
 `apps/*` consume `packages/*/dist`, not their sources — so **packages must be built before an
 app can resolve them**. `pnpm -r build` walks the graph in topological order; the root
 `pnpm typecheck` builds `shared` and `payroll-engine` first and then type-checks everything
-else. A fresh clone therefore needs `pnpm build` (or `pnpm typecheck`) before an app's own
-`tsc`/`vite` run will resolve `@hexpayroll/*`.
+else. `pnpm dev` and `pnpm dev:browser` run `pnpm build:packages` before starting apps.
+Direct web and API `dev` commands also build their workspace dependencies before starting,
+and a failed build prevents startup. A fresh clone still needs `pnpm build:packages`
+(or `pnpm build` / `pnpm typecheck`) before running app checks or Vite directly.
+Dependencies rebuild on each startup; shared-package source edits require rebuilding
+the packages and restarting development processes.
 
 ## Scripts
 
@@ -29,6 +33,7 @@ else. A fresh clone therefore needs `pnpm build` (or `pnpm typecheck`) before an
 | `pnpm dev:browser`             | API + web dev server only, no Electron — for UI work in a normal browser |
 | `pnpm dev:desktop`             | Electron shell only; expects the web dev server to be running            |
 | `pnpm build`                   | `pnpm -r build` — every package and app                                  |
+| `pnpm build:packages`          | builds shared, then payroll-engine, without building apps                |
 | `pnpm typecheck`               | builds `packages/*`, then type-checks every project                      |
 | `pnpm lint`                    | ESLint 10 across the repo                                                |
 | `pnpm format` / `format:check` | Prettier write / verify                                                  |

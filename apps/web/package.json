@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Hex Payroll React UI. Consumed by the Electron desktop shell today and by a future browser build, with no Electron coupling.",
   "scripts": {
-    "dev": "vite",
+    "dev": "pnpm --filter @hexpayroll/shared build && vite",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "preview": "vite preview",
     "typecheck": "tsc -p tsconfig.json --noEmit",
