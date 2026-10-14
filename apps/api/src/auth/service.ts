@@ -47,7 +47,10 @@ export function createAuthService(database: Pool) {
         ]);
         const actor = await getActor(client, row.id);
         await audit(client, actor, 'CREATE', 'auth_users', row.id, ['username', 'displayName']);
-        await enqueueAccount(client, row.id);
+        // The first local account exists before organization setup. It cannot
+        // have a tenant-scoped sync event yet; enrollment must never gate login
+        // or local bootstrap. Preserve existing account export after setup.
+        if (actor.organizationId) await enqueueAccount(client, row.id);
         return publicUser(row);
       });
     },

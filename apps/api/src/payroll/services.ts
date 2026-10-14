@@ -1,3 +1,4 @@
+import { enqueueOutbox } from '../sync/outbox.js';
 import { createHash } from 'node:crypto';
 import type { Pool, PoolClient } from 'pg';
 import type { z } from 'zod';
@@ -119,10 +120,14 @@ async function event(
       JSON.stringify({ revision: row.revision ?? 1 }),
     ],
   );
-  await c.query(
-    'INSERT INTO sync_outbox(organization_id,entity_type,entity_id,operation,revision,payload) VALUES($1,$2,$3,$4,$5,$6)',
-    [a.organizationId, entity, row.id, operation, row.revision ?? 1, payload],
-  );
+  await enqueueOutbox(c, {
+    organizationId: a.organizationId!,
+    entityType: entity,
+    entityId: String(row.id),
+    operation,
+    revision: Number(row.revision ?? 1),
+    payload: row,
+  });
 }
 async function supersede(
   c: PoolClient,
@@ -1014,6 +1019,7 @@ export function createPayrollService(pool: Pool) {
           )
         ).rows[0]!;
         const results: PayrollResult[] = [];
+        const saveResults: (() => Promise<void>)[] = [];
         for (const context of loaded.contexts) {
           let result: PayrollResult;
           try {
@@ -1031,35 +1037,39 @@ export function createPayrollService(pool: Pool) {
           const employee = (loaded.snapshot.employees as { id: string }[]).find(
             (e) => e.id === context.employeeId,
           );
-          await saveResult(c, a, run.id, result, {
-            company: loaded.snapshot.company,
-            engineVersion: PAYROLL_ENGINE_VERSION,
-            employee,
-            context,
-            policyVersion: (loaded.snapshot.policies as unknown[])[0],
-            payrollConfiguration: (loaded.snapshot.configuration as unknown[])[0] ?? null,
-            attendanceFacts: (loaded.snapshot.attendance as AttendanceRow[])
-              .filter((fact) => fact.employee_id === context.employeeId)
-              .map((fact) => ({
-                id: fact.id,
-                date: fact.work_date,
-                revision: fact.revision,
-                approvalStatus: fact.approval_status,
-                schedule: fact.result.schedule,
-                leaves: fact.result.leaves,
-              })),
-          });
+          saveResults.push(() =>
+            saveResult(c, a, run.id, result, {
+              company: loaded.snapshot.company,
+              engineVersion: PAYROLL_ENGINE_VERSION,
+              employee,
+              context,
+              policyVersion: (loaded.snapshot.policies as unknown[])[0],
+              payrollConfiguration: (loaded.snapshot.configuration as unknown[])[0] ?? null,
+              attendanceFacts: (loaded.snapshot.attendance as AttendanceRow[])
+                .filter((fact) => fact.employee_id === context.employeeId)
+                .map((fact) => ({
+                  id: fact.id,
+                  date: fact.work_date,
+                  revision: fact.revision,
+                  approvalStatus: fact.approval_status,
+                  schedule: fact.result.schedule,
+                  leaves: fact.result.leaves,
+                })),
+            }),
+          );
         }
         for (const employee of loaded.snapshot.employees as { id: string }[]) {
           if (results.some((r) => r.employeeId === employee.id)) continue;
           const failed = emptyResult(employee.id, 'No monetary policy covers the payroll period');
           failed.issues.push(...loaded.issues);
           results.push(failed);
-          await saveResult(c, a, run.id, failed, {
-            engineVersion: PAYROLL_ENGINE_VERSION,
-            employee,
-            policy: null,
-          });
+          saveResults.push(() =>
+            saveResult(c, a, run.id, failed, {
+              engineVersion: PAYROLL_ENGINE_VERSION,
+              employee,
+              policy: null,
+            }),
+          );
         }
         const issues = [
           ...loaded.issues,
@@ -1096,6 +1106,8 @@ export function createPayrollService(pool: Pool) {
           { ...updated, snapshot: undefined },
           recompute ? 'Payroll recomputed' : 'Payroll computed',
         );
+        // Publish the parent run before employee results and their lines.
+        for (const save of saveResults) await save();
         const changed = (
           await c.query(
             "UPDATE payroll_periods SET latest_run_id=$2,status='review',reviewed_run_id=NULL,reviewed_by=NULL,reviewed_at=NULL,warning_acknowledgments='[]',revision=revision+1,updated_at=now() WHERE id=$1 RETURNING *",

@@ -359,8 +359,23 @@ export const auditEventSchema = z
   .strict();
 export const syncSummarySchema = z
   .object({
-    configured: z.literal(false),
-    nodeProvisioned: z.literal(false),
+    configured: z.boolean(),
+    nodeProvisioned: z.boolean(),
+    mode: z.enum(['disabled', 'local', 'central']),
+    awaitingApplication: z.number().int().nonnegative(),
+    conflicts: z.number().int().nonnegative(),
+    lastSuccessfulPush: z.iso.datetime().nullable(),
+    workerState: z.enum([
+      'disabled',
+      'starting',
+      'idle',
+      'running',
+      'blocked',
+      'stopping',
+      'stopped',
+    ]),
+    transportAvailability: z.enum(['unconfigured', 'unknown', 'available', 'unavailable']),
+    lastTransportVerification: z.iso.datetime().nullable(),
     pending: z.number().int().nonnegative(),
     processing: z.number().int().nonnegative(),
     synced: z.number().int().nonnegative(),

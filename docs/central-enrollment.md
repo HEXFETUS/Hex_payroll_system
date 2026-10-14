@@ -40,7 +40,9 @@ API endpoint. Remote plain HTTP, URL credentials, query strings and fragments
 are rejected. Loopback HTTP is accepted only for local tests.
 
 Import verifies the UUID against local `application_setup`, stores the matching
-node/hash, and refuses another active local node or a changed/revoked identity.
+node/hash, and refuses another enrolled active local node or a changed/revoked identity.
+An unenrolled offline node from migration `0033` does not prevent import. Future
+outbox events use the enrolled node; existing events retain their historical origin.
 The exact same credential can be retried if configuration-file delivery failed.
 The CLI stages a private environment file before the database operation, checks
 for intervening `.env` edits, then replaces `.env`. If replacement fails after

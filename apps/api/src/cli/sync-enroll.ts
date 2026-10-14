@@ -5,6 +5,7 @@ import { syncRegistrationResponseSchema, syncRegistrationSchema } from '@hexpayr
 import { pool } from '../db/pool.js';
 import { transaction } from '../foundation/repository.js';
 import { tokenHash } from '../auth/service.js';
+import { selectLocalOrigin } from '../sync/outbox.js';
 
 class EnrollmentError extends Error {}
 
@@ -52,6 +53,7 @@ try {
       'INSERT INTO sync_nodes(id,organization_id,device_name,token_hash) VALUES($1,$2,$3,$4)',
       [node.nodeId, node.organizationId, body.deviceName, tokenHash(node.token)],
     );
+    await selectLocalOrigin(c, node.organizationId, node.nodeId);
   });
   const original = await readFile('.env', 'utf8');
   const lines = original

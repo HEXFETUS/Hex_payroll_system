@@ -1,14 +1,20 @@
 # Phase 4A: synchronization transport
 
+The local outgoing worker is now hardened by
+[Phase 4.1](phase4.1-offline-sync.md), including migration `0033`, strict FIFO,
+bounded retries, cancellation, and truthful status. The protocol described here
+remains compatible; use the Phase 4.1 worker/configuration details below.
+
 Phase 4A delivers events from the existing local outbox to a durable central
 ledger and pulls that ledger into a local inbox. It does **not** apply received
-events to workforce, attendance, or payroll tables. `synced` means central
-transport receipt, not business replication. `sync_inbox.applied_at` stays null.
+events to workforce, attendance, or payroll tables. The pre-existing account
+receiver applies supported account events only. `synced` means central
+transport receipt, not business replication.
 
 ## Deployment prerequisites
 
 Both hosts must run the same API/shared build, PostgreSQL 18, and immutable
-migrations through `0029_sync_delivery_safety.sql`. The local `0028` remains
+migrations through `0033_offline_sync_foundation.sql`. The local `0028` remains
 unchanged. `0029` adds organization/node foreign keys, publication ordering,
 outbox leases/receipts, and the inbox. Apply migrations with the project runner,
 never `psql -f`, Drizzle push, or manually edited generated schema.
@@ -103,12 +109,15 @@ last **durably received** central sequence. Network or inbox failures do not
 advance it. Returned organization/order/cursor/response sizes are checked before
 receipt. Duplicate concurrent pulls recheck the cursor under a node row lock.
 
-Outgoing batches use `FOR UPDATE SKIP LOCKED`, UUID lease tokens, and 30-second
-leases. HTTP calls time out after 10 seconds. A process crash leaves a recoverable
-lease; stale workers cannot acknowledge another worker's batch. Lost HTTP
-responses retry the same event IDs. Transient errors use exponential backoff up
-to 300 seconds. Rejected payloads, invalid/revoked credentials, and conflicts
-become `failed` for administrator review/retry; attempt counts remain intact.
+Outgoing batches use organization-serialized FIFO claims, UUID lease tokens,
+and configurable leases (30 seconds by default). HTTP calls time out after 10
+seconds by default. A process crash leaves a recoverable lease; stale workers
+cannot acknowledge another worker's batch. Lost HTTP responses retry the same
+event IDs. Transient errors use exponential backoff with equal jitter up to
+300 seconds and ten attempts per automatic cycle by default. Rejected payloads,
+invalid/revoked credentials, conflicts, and exhausted cycles become `failed`
+for administrator review/retry; lifetime attempt counts remain intact. Failed,
+deferred, or processing predecessors block later outgoing events.
 An unavailable outgoing connection does not prevent independent pull attempts.
 Local operations remain usable while central is unavailable.
 

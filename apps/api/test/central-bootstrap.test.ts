@@ -51,6 +51,8 @@ test(
           'SELECT, INSERT ON organizations',
           'SELECT ON roles',
           'INSERT ON user_roles, audit_events, sync_outbox',
+          'SELECT, INSERT ON sync_nodes, sync_local_identity',
+          'USAGE, SELECT ON SEQUENCE sync_outbox_publication_seq',
         ])
           await fixture.migrator.query(`GRANT ${grant} TO hexpayroll_bootstrap`);
         bootstrapPool = new pg.Pool({

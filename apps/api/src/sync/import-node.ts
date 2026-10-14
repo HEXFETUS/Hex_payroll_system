@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { nodeCredentialSchema } from './administration.js';
 import { transaction } from '../foundation/repository.js';
 import { tokenHash } from '../auth/service.js';
+import { selectLocalOrigin } from './outbox.js';
 
 export const centralEndpointSchema = z
   .string()
@@ -39,7 +40,11 @@ export async function importLocalNode(database: Pool, input: unknown) {
       (same.token_hash !== tokenHash(credential.token) || !same.enabled || same.revoked_at)
     )
       throw new Error('Existing node identity differs or was revoked');
-    if (existing.rows.some((row) => row.id !== credential.nodeId && row.enabled && !row.revoked_at))
+    if (
+      existing.rows.some(
+        (row) => row.id !== credential.nodeId && row.token_hash && row.enabled && !row.revoked_at,
+      )
+    )
       throw new Error('Local installation already has an active node');
     if (!same)
       await client.query(
@@ -51,6 +56,8 @@ export async function importLocalNode(database: Pool, input: unknown) {
           tokenHash(credential.token),
         ],
       );
+    // Future events use the enrolled identity; already queued origins are immutable.
+    await selectLocalOrigin(client, credential.organizationId, credential.nodeId);
   });
   return credential;
 }

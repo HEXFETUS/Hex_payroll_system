@@ -1,3 +1,4 @@
+import { enqueueOutbox } from '../sync/outbox.js';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import '../db/types.js';
 import { sql, eq } from 'drizzle-orm';
@@ -291,10 +292,14 @@ export async function outbox(
       return Object.fromEntries(Object.entries(version).filter(([key]) => allowed.includes(key)));
     });
   }
-  await client.query(
-    'INSERT INTO sync_outbox(organization_id,entity_type,entity_id,operation,revision,payload) VALUES($1,$2,$3,$4,$5,$6)',
-    [row.organizationId ?? row.id, table, row.id, operation, row.revision, JSON.stringify(payload)],
-  );
+  await enqueueOutbox(client, {
+    organizationId: String(row.organizationId ?? row.id),
+    entityType: table,
+    entityId: row.id,
+    operation,
+    revision: Number(row.revision),
+    payload,
+  });
 }
 const snake = (key: string) => key.replace(/[A-Z]/g, (c) => '_' + c.toLowerCase());
 export async function insert(

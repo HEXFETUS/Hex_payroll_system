@@ -19,6 +19,7 @@ import {
   centavosToDecimalString,
   formatPeso,
   managedUserSchema,
+  syncSummarySchema,
   type FoundationRecord,
 } from '@hexpayroll/shared';
 import { useAuth } from '../auth/AuthProvider';
@@ -1370,29 +1371,33 @@ export function AuditPage() {
 export function SyncPage() {
   const { session } = useAuth();
   const query = useQuery({
-    queryKey: ['operations', 'sync'],
-    queryFn: () => foundationRequest('sync/summary', session!.accessToken),
+    queryKey: ['operations', 'sync', session?.user.organizationId, session?.accessToken],
+    queryFn: async () =>
+      syncSummarySchema.parse(await foundationRequest('sync/summary', session!.accessToken)),
     networkMode: 'always',
     refetchInterval: 15000,
   });
-  const data = query.data as Record<string, unknown> | undefined;
+  const data = query.isError ? undefined : query.data;
   return (
     <div className="space-y-5">
       <p className="notice">
         {data?.configured
-          ? 'Sync transport is configured. Delivered events are stored durably; business records are not yet replicated.'
+          ? 'Sync transport is configured. Only verified durable receipts mark outgoing events delivered.'
           : 'Sync transport is disabled. Local operations remain available without Internet.'}
       </p>
       <QueryNotice pending={query.isPending} error={query.error} />
       {data && (
         <p className="text-sm text-slate-500">
           Delivered: {String(data.synced)}. Awaiting business application:{' '}
-          {String(data.awaitingApplication)}. Open transport conflicts: {String(data.conflicts)}.
+          {String(data.awaitingApplication)}. Open transport conflicts: {String(data.conflicts)}.{' '}
+          Worker: {data.workerState}. Transport: {data.transportAvailability}. Last successful push:{' '}
+          {data.lastSuccessfulPush ?? 'none'}. Last transport verification:{' '}
+          {data.lastTransportVerification ?? 'none'}.
         </p>
       )}
       {data && (
         <div className="grid gap-4 sm:grid-cols-4">
-          {['pending', 'processing', 'synced', 'failed'].map((k) => (
+          {(['pending', 'processing', 'synced', 'failed'] as const).map((k) => (
             <section className="panel p-5" key={k}>
               <h2 className="text-sm capitalize">{k}</h2>
               <p className="mt-3 text-2xl">{String(data[k])}</p>

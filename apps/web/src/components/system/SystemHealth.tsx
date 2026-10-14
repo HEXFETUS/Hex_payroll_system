@@ -30,7 +30,7 @@ export function useHealthItems() {
     refetchInterval: 15000,
   });
   const sync = useQuery({
-    queryKey: ['operations', 'sync'],
+    queryKey: ['operations', 'sync', session?.user.organizationId, session?.accessToken],
     queryFn: async () =>
       syncSummarySchema.parse(await foundationRequest('sync/summary', session!.accessToken)),
     enabled: Boolean(
@@ -40,6 +40,7 @@ export function useHealthItems() {
     refetchInterval: 15000,
   });
   const health = useSystemHealth();
+  const syncData = sync.isError ? undefined : sync.data;
   const online = useNetworkConnection();
   const data = health.isError ? undefined : health.data;
   const pending = health.isPending && !health.isError;
@@ -86,12 +87,33 @@ export function useHealthItems() {
     },
     {
       name: 'Synchronization',
-      label: sync.data ? `${sync.data.pending} pending` : 'Not configured',
-      tone: 'not-configured',
-      detail: 'Local changes are tracked in a durable outbox. The sync engine is not configured.',
+      label: sync.isError
+        ? 'Status unavailable'
+        : syncData
+          ? syncData.transportAvailability === 'available'
+            ? `${syncData.pending} pending`
+            : syncData.transportAvailability
+          : 'Unknown',
+      tone: sync.isError
+        ? 'warning'
+        : syncData?.failed
+          ? 'warning'
+          : syncData?.transportAvailability === 'available'
+            ? 'healthy'
+            : syncData?.transportAvailability === 'unavailable'
+              ? 'offline'
+              : syncData?.transportAvailability === 'unconfigured'
+                ? 'not-configured'
+                : 'checking',
+      detail: syncData
+        ? `Worker: ${syncData.workerState}. ${syncData.pending} pending, ${syncData.processing} processing, ${syncData.failed} failed. Last successful push: ${syncData.lastSuccessfulPush ?? 'none'}. Local operations remain available offline.`
+        : 'Synchronization status has not been verified.',
     },
   ];
-  return { health, items, data, integration };
+  const syncEnabled = Boolean(
+    session?.user.organizationId && session.user.permissions?.includes('sync.view'),
+  );
+  return { health, sync, syncEnabled, items, data, integration };
 }
 export function HealthCard({
   name,
@@ -134,7 +156,7 @@ export function SystemHealthWidget() {
   );
 }
 export function SystemHealthPage() {
-  const { health, items, data, integration } = useHealthItems();
+  const { health, sync, syncEnabled, items, data, integration } = useHealthItems();
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -143,8 +165,11 @@ export function SystemHealthPage() {
         </p>
         <button
           className="secondary-button"
-          disabled={health.isFetching}
-          onClick={() => void health.refetch()}
+          disabled={health.isFetching || sync.isFetching}
+          onClick={() => {
+            void health.refetch();
+            if (syncEnabled) void sync.refetch();
+          }}
         >
           {health.isFetching ? 'Checking…' : 'Refresh status'}
         </button>

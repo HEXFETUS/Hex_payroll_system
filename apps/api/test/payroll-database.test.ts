@@ -22,6 +22,7 @@ import {
 } from '../src/timekeeping/services.js';
 import { createPayrollService, payrollLock } from '../src/payroll/services.js';
 import { createPayrollRouter } from '../src/payroll/router.js';
+import { disconnectTransport } from './offline-fixture.js';
 
 test(
   'payroll database workflow, concurrency, immutability, snapshots, and rollback',
@@ -119,6 +120,7 @@ test(
         }),
       );
       const input = () => ({ expectedRevision: p.revision as number, warningAcknowledgments: [] });
+      await disconnectTransport(f.runtime, org);
       const refresh = async () => {
         p = (await service.detail(actor, p.id as string)).period;
       };
@@ -261,6 +263,19 @@ test(
         true,
       );
       assert.equal(run.status, 'computed', JSON.stringify(run.issues));
+      const dependencies = await f.runtime.query(
+        `SELECT publication_sequence,entity_type,payload FROM sync_outbox
+         WHERE entity_type IN ('payroll_runs','employee_payroll_results','payroll_earning_lines','payroll_deduction_lines','payroll_contribution_lines') ORDER BY publication_sequence`,
+      );
+      const published = dependencies.rows;
+      for (const event of published) {
+        const parentId = event.payload.payroll_run_id ?? event.payload.result_id;
+        if (!parentId) continue;
+        const parent = published.find((candidate) => candidate.payload.id === parentId);
+        assert.ok(
+          parent && BigInt(parent.publication_sequence) < BigInt(event.publication_sequence),
+        );
+      }
       await refresh();
       await t.test('recomputation retries return one persisted run', async () => {
         const key = randomUUID();

@@ -21,17 +21,21 @@ load the application's `.env` or change grants.
 The intended temporary bootstrap role needs CONNECT to the target database,
 USAGE on public, and only these table operations:
 
-| Table             | Operations             |
-| ----------------- | ---------------------- |
-| application_setup | SELECT, UPDATE         |
-| auth_users        | SELECT, INSERT, UPDATE |
-| organizations     | SELECT, INSERT         |
-| roles             | SELECT                 |
-| user_roles        | INSERT                 |
-| audit_events      | INSERT                 |
-| sync_outbox       | INSERT                 |
+| Table               | Operations             |
+| ------------------- | ---------------------- |
+| application_setup   | SELECT, UPDATE         |
+| auth_users          | SELECT, INSERT, UPDATE |
+| organizations       | SELECT, INSERT         |
+| roles               | SELECT                 |
+| user_roles          | INSERT                 |
+| audit_events        | INSERT                 |
+| sync_outbox         | INSERT                 |
+| sync_nodes          | SELECT, INSERT         |
+| sync_local_identity | SELECT, INSERT         |
 
 The existing UUID defaults and inserts must also be executable by that role.
+Migration `0033` also requires USAGE/SELECT on `sync_outbox_publication_seq`
+and EXECUTE on `hex_local_sync_node(uuid)` for transactional origin assignment.
 It needs no DDL, role management, DELETE, or access to payroll business tables.
 Role provisioning and verification are separate operator steps; this change
 does not create a privileged role or run anything against the VPS.

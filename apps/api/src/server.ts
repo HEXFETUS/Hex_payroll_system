@@ -20,6 +20,12 @@ async function main(): Promise<void> {
           { url: env.SYNC_CENTRAL_URL!, nodeId: env.SYNC_NODE_ID!, token: env.SYNC_NODE_TOKEN! },
           env.SYNC_INTERVAL_MS,
           () => logger.warn('Synchronization unavailable; local operations continue'),
+          {
+            batchSize: env.SYNC_BATCH_SIZE,
+            timeoutMs: env.SYNC_REQUEST_TIMEOUT_MS,
+            leaseMs: env.SYNC_LEASE_MS,
+            maxAttempts: env.SYNC_MAX_ATTEMPTS,
+          },
         )
       : async () => {};
   const stopWorker = startLocalAttendanceWorker(env.SYNC_MODE, () =>
@@ -38,16 +44,22 @@ async function main(): Promise<void> {
     );
   });
 
+  let shuttingDown = false;
   const shutdown = (signal: NodeJS.Signals): void => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     logger.info({ signal }, 'shutting down');
-    server.close(() => {
-      void stopWorker()
-        .then(() => stopSync())
-        .then(() => pool.end())
-        .then(() => {
-          process.exit(0);
-        });
-    });
+    const closed = new Promise<void>((resolve) => server.close(() => resolve()));
+    // Stop scheduling and abort sync immediately, before waiting for HTTP clients.
+    void Promise.all([closed, stopWorker(), stopSync()])
+      .then(() => pool.end())
+      .then(() => {
+        process.exit(0);
+      })
+      .catch(() => {
+        logger.error('Shutdown failed');
+        process.exit(1);
+      });
   };
 
   process.on('SIGINT', shutdown);

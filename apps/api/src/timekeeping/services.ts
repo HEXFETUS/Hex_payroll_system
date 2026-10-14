@@ -233,7 +233,6 @@ export function createScheduleService(pool: Pool) {
             versionId: version.id,
           });
         version.days = days;
-        await publish(c, actor, 'work_schedule_versions', version);
         await publish(
           c,
           actor,
@@ -242,6 +241,7 @@ export function createScheduleService(pool: Pool) {
           id ? 'UPDATE' : 'CREATE',
           Object.keys(master),
         );
+        await publish(c, actor, 'work_schedule_versions', version);
         const date = await today(c, org);
         const assignments = await c.query<{
           employee_id: string;

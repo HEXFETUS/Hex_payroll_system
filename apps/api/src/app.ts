@@ -90,6 +90,7 @@ export function createApp(): Express {
     '/api',
     createFoundationRouter(pool, {
       mode: env.SYNC_MODE,
+      interval: env.SYNC_INTERVAL_MS,
       ...(env.SYNC_NODE_ID ? { nodeId: env.SYNC_NODE_ID } : {}),
     }),
   );

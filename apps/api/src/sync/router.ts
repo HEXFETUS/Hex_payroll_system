@@ -103,7 +103,7 @@ export function createSyncRouter(pool: Pool, central: boolean) {
         'Retry outgoing events on the local installation',
       );
     const r = await pool.query(
-      "UPDATE sync_outbox SET status='pending',next_attempt_at=NULL,error=NULL WHERE organization_id=$1 AND status='failed' RETURNING id",
+      "UPDATE sync_outbox SET status='pending',retry_cycle_attempts=0,next_attempt_at=NULL,error=NULL WHERE organization_id=$1 AND status='failed' RETURNING id",
       [a.organizationId],
     );
     res.json({ retried: r.rowCount });

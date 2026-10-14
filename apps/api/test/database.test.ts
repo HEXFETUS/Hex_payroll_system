@@ -36,6 +36,10 @@ test(
         displayName: 'Payroll Clerk',
         password,
       });
+      assert.equal(
+        (await runtime.query('SELECT count(*)::int count FROM sync_outbox')).rows[0].count,
+        0,
+      );
       await assert.rejects(
         () => service.createUser({ username: 'clerk', displayName: 'Other', password }),
         (error) =>

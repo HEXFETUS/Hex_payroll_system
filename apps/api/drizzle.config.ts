@@ -48,6 +48,7 @@ export default defineConfig({
     'payroll_configurations',
     'audit_events',
     'sync_nodes',
+    'sync_local_identity',
     'sync_outbox',
     'sync_changes',
     'sync_conflicts',

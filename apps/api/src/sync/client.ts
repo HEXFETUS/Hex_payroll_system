@@ -1,138 +1,44 @@
 import type { Pool } from 'pg';
-import { randomUUID } from 'node:crypto';
-import {
-  syncEventSchema,
-  syncPullResponseSchema,
-  syncPushResponseSchema,
-} from '@hexpayroll/shared';
+import { syncPullResponseSchema } from '@hexpayroll/shared';
 import { transaction } from '../foundation/repository.js';
-import { tokenHash } from '../auth/service.js';
 import { applyInboxBatch } from './inbox.js';
+import { ensureNode, pushNextBatch, type PushOptions } from './delivery.js';
+import { syncRequest, type SyncClientConfig, type RequestOptions } from './transport.js';
+import { syncWorkerStatus, type SyncWorkerStatus } from './status.js';
+import { startWorker } from './worker.js';
+import { selectLocalOrigin } from './outbox.js';
+export { pushNextBatch } from './delivery.js';
+export { TransportError, syncRequest, type SyncClientConfig } from './transport.js';
 
-export interface SyncClientConfig {
-  url: string;
-  nodeId: string;
-  token: string;
-}
-export class TransportError extends Error {
-  constructor(public status: number) {
-    super(`Synchronization HTTP ${status}`);
-  }
-}
-export async function syncRequest(config: SyncClientConfig, path: string, body?: unknown) {
-  const response = await fetch(config.url.replace(/\/$/, '') + '/api/sync/' + path, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: {
-      Authorization: `Bearer ${config.token}`,
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(10000),
-    redirect: 'error',
-  });
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new TransportError(response.status);
-  }
-  // Enforce the bound while reading, even when Content-Length is absent.
-  const reader = response.body?.getReader();
-  if (!reader) throw new Error('Empty synchronization response');
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  try {
-    while (true) {
-      const part = await reader.read();
-      if (part.done) break;
-      size += part.value.byteLength;
-      if (size > 1048576) throw new Error('Synchronization response exceeds limit');
-      chunks.push(part.value);
-    }
-  } finally {
-    await reader.cancel();
-  }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
-}
-async function ensureNode(pool: Pool, config: SyncClientConfig) {
-  const r = await pool.query<{ organization_id: string }>(
-    'SELECT organization_id FROM sync_nodes WHERE id=$1 AND token_hash=$2 AND enabled AND revoked_at IS NULL',
-    [config.nodeId, tokenHash(config.token)],
-  );
-  if (!r.rows[0]) throw new Error('Local installation not enrolled');
-  return r.rows[0].organization_id;
-}
-export async function pushNextBatch(pool: Pool, config: SyncClientConfig) {
-  const org = await ensureNode(pool, config),
-    lease = randomUUID();
-  const rows = await transaction(pool, async (c) => {
-    const result = await c.query(
-      `WITH batch AS (SELECT id FROM sync_outbox WHERE organization_id=$1 AND
-       ((status='pending' AND (next_attempt_at IS NULL OR next_attempt_at<=now())) OR (status='processing' AND (lease_expires_at IS NULL OR lease_expires_at<=now())))
-       ORDER BY created_at,id FOR UPDATE SKIP LOCKED LIMIT 3)
-       UPDATE sync_outbox o SET status='processing',lease_token=$2,lease_expires_at=now()+interval '30 seconds',attempt_count=attempt_count+1,last_attempt_at=now(),error=NULL
-       FROM batch WHERE o.id=batch.id RETURNING o.*`,
-      [org, lease],
-    );
-    return result.rows.sort((a, b) => String(a.id).localeCompare(String(b.id)));
-  });
-  if (!rows.length) return false;
-  try {
-    const events = rows.map((r) =>
-      syncEventSchema.parse({
-        eventId: r.id,
-        entityType: r.entity_type,
-        entityId: r.entity_id,
-        operation: r.operation,
-        revision: r.revision,
-        payloadVersion: r.payload_version,
-        payload: r.payload,
-      }),
-    );
-    const response = syncPushResponseSchema.parse(await syncRequest(config, 'push', { events }));
-    if (
-      response.receipts.length !== rows.length ||
-      new Set(response.receipts.map((r) => r.eventId)).size !== rows.length ||
-      response.receipts.some((r) => !rows.some((row) => row.id === r.eventId)) ||
-      response.receipts.some((r) => r.sequence === '0')
-    )
-      throw new Error('Invalid delivery acknowledgment');
-    await transaction(pool, async (c) => {
-      for (const receipt of response.receipts)
-        await c.query(
-          "UPDATE sync_outbox SET status='synced',central_sequence=$3,synced_at=now(),lease_token=NULL,lease_expires_at=NULL,next_attempt_at=NULL,error=NULL WHERE id=$1 AND lease_token=$2 AND status='processing'",
-          [receipt.eventId, lease, receipt.sequence],
-        );
-    });
-  } catch (error) {
-    const permanent =
-      error instanceof TransportError && [400, 401, 403, 409, 413, 422].includes(error.status);
-    await pool.query(
-      `UPDATE sync_outbox SET status=$2,error=$3,lease_token=NULL,lease_expires_at=NULL,next_attempt_at=now()+make_interval(secs=>LEAST(300,power(2,LEAST(attempt_count,8))::integer)) WHERE lease_token=$1 AND status='processing'`,
-      [
-        lease,
-        permanent ? 'failed' : 'pending',
-        permanent
-          ? `Transport rejected batch (${error.status}); review and retry required`
-          : 'Transport unavailable or acknowledgment invalid; retry scheduled',
-      ],
-    );
-    throw error;
-  }
-  return true;
-}
-export async function pullNextBatch(pool: Pool, config: SyncClientConfig) {
+export async function pullNextBatch(
+  pool: Pool,
+  config: SyncClientConfig,
+  options: RequestOptions & { status?: SyncWorkerStatus } = {},
+) {
   const org = await ensureNode(pool, config);
   const r = await pool.query('SELECT last_pull_sequence::text FROM sync_nodes WHERE id=$1', [
     config.nodeId,
   ]);
   const after: string = r.rows[0]!.last_pull_sequence;
-  const response = syncPullResponseSchema.parse(await syncRequest(config, 'pull?after=' + after));
-  let previous = BigInt(after);
-  for (const change of response.changes) {
-    if (change.organizationId !== org || BigInt(change.sequence) <= previous)
-      throw new Error('Invalid change stream');
-    previous = BigInt(change.sequence);
-  }
-  if (BigInt(response.nextSequence) !== previous) throw new Error('Invalid pull cursor');
+  const response = await (async () => {
+    try {
+      const response = syncPullResponseSchema.parse(
+        await syncRequest(config, 'pull?after=' + after, undefined, options),
+      );
+      let previous = BigInt(after);
+      for (const change of response.changes) {
+        if (change.organizationId !== org || BigInt(change.sequence) <= previous)
+          throw new Error('Invalid change stream');
+        previous = BigInt(change.sequence);
+      }
+      if (BigInt(response.nextSequence) !== previous) throw new Error('Invalid pull cursor');
+      options.status?.recordTransport(true);
+      return response;
+    } catch (error) {
+      if (!options.signal?.aborted) options.status?.recordTransport(false);
+      throw error;
+    }
+  })();
   await transaction(pool, async (c) => {
     const node = await c.query(
       'SELECT last_pull_sequence::text FROM sync_nodes WHERE id=$1 AND enabled FOR UPDATE',
@@ -163,44 +69,34 @@ export async function pullNextBatch(pool: Pool, config: SyncClientConfig) {
   });
   return response.changes.length > 0;
 }
+
 export function startSyncWorker(
   pool: Pool,
   config: SyncClientConfig,
   interval: number,
   onError: () => void,
+  options: PushOptions = {},
 ) {
-  let stopped = false,
-    running: Promise<void> | null = null;
-  const tick = () => {
-    if (stopped || running) return;
-    running = (async () => {
-      // Pull continues even if one outgoing event needs operator review.
-      try {
-        await pushNextBatch(pool, config);
-      } catch {
-        onError();
-      }
-      try {
-        await pullNextBatch(pool, config);
-      } catch {
-        onError();
-      }
-      try {
-        const result = await applyInboxBatch(pool, await ensureNode(pool, config));
+  const status = options.status ?? syncWorkerStatus;
+  let identityEstablished = false;
+  return startWorker(
+    {
+      prepare: async () => {
+        status.organizationId = await ensureNode(pool, config);
+        if (!identityEstablished) {
+          await transaction(pool, (client) =>
+            selectLocalOrigin(client, status.organizationId!, config.nodeId),
+          );
+          identityEstablished = true;
+        }
+      },
+      push: (signal) => pushNextBatch(pool, config, { ...options, signal, status }),
+      pull: (signal) => pullNextBatch(pool, config, { ...options, signal, status }),
+      apply: async () => {
+        const result = await applyInboxBatch(pool, status.organizationId!);
         if (result.pending) onError();
-      } catch {
-        onError();
-      }
-    })().finally(() => {
-      running = null;
-    });
-  };
-  const timer = setInterval(tick, interval);
-  timer.unref();
-  tick();
-  return async () => {
-    stopped = true;
-    clearInterval(timer);
-    await running;
-  };
+      },
+    },
+    { interval, status, onError },
+  );
 }

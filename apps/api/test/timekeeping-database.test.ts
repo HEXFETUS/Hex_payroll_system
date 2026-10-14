@@ -18,6 +18,7 @@ import {
   processAttendance,
 } from '../src/timekeeping/services.js';
 import { processNextJob, scheduleDueAttendance } from '../src/timekeeping/worker.js';
+import { disconnectTransport } from './offline-fixture.js';
 
 test(
   'persisted timekeeping: evidence, history, approval, permissions, rollback and rerunnable jobs',
@@ -86,6 +87,14 @@ test(
         reason: 'Historical setup',
         days,
       });
+      const scheduleEvents = await f.runtime.query(
+        "SELECT entity_type FROM sync_outbox WHERE entity_type IN ('work_schedules','work_schedule_versions') ORDER BY publication_sequence",
+      );
+      assert.deepEqual(
+        scheduleEvents.rows.map((row) => row.entity_type),
+        ['work_schedules', 'work_schedule_versions'],
+      );
+      await disconnectTransport(f.runtime, org);
       await schedules.assign(actor, employee.id, {
         scheduleId: schedule.id,
         effectiveFrom: '2025-01-01',

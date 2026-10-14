@@ -22,6 +22,7 @@ import {
   type FoundationRecord,
 } from '@hexpayroll/shared';
 import { hashPassword } from '../auth/password.js';
+import { syncWorkerStatus, type SyncWorkerStatus } from '../sync/status.js';
 import {
   DomainError,
   transaction,
@@ -80,7 +81,9 @@ async function protectAdministrator(client: PoolClient) {
 }
 export function createFoundationRouter(
   pool: Pool,
-  syncConfig: { mode: string; nodeId?: string } = { mode: 'disabled' },
+  syncConfig: { mode: string; nodeId?: string; interval?: number; status?: SyncWorkerStatus } = {
+    mode: 'disabled',
+  },
 ) {
   const router = Router();
   router.use((_req, res, next) => {
@@ -711,11 +714,23 @@ export function createFoundationRouter(
     res.json({
       configured: syncConfig.mode !== 'disabled',
       mode: syncConfig.mode,
+      ...(syncConfig.status ?? syncWorkerStatus).snapshot(
+        syncConfig.mode,
+        who.organizationId,
+        syncConfig.interval ?? 15000,
+      ),
+      lastSuccessfulPush:
+        (
+          await pool.query(
+            "SELECT max(synced_at) AS last FROM sync_outbox WHERE organization_id=$1 AND status='synced'",
+            [who.organizationId],
+          )
+        ).rows[0].last?.toISOString() ?? null,
       nodeProvisioned: Boolean(
         syncConfig.nodeId &&
         (
           await pool.query(
-            'SELECT 1 FROM sync_nodes WHERE id=$1 AND organization_id=$2 AND enabled AND token_hash IS NOT NULL',
+            'SELECT 1 FROM sync_nodes WHERE id=$1 AND organization_id=$2 AND enabled AND revoked_at IS NULL AND token_hash IS NOT NULL',
             [syncConfig.nodeId, who.organizationId],
           )
         ).rowCount,

@@ -37,8 +37,18 @@ const envSchema = z
       .regex(/^[A-Za-z0-9_-]{43}$/)
       .optional(),
     SYNC_INTERVAL_MS: z.coerce.number().int().min(1000).max(300000).default(15000),
+    SYNC_BATCH_SIZE: z.coerce.number().int().min(1).max(3).default(3),
+    SYNC_REQUEST_TIMEOUT_MS: z.coerce.number().int().min(100).max(60000).default(10000),
+    SYNC_LEASE_MS: z.coerce.number().int().min(1000).max(300000).default(30000),
+    SYNC_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(100).default(10),
   })
   .superRefine((value, ctx) => {
+    if (value.SYNC_LEASE_MS <= value.SYNC_REQUEST_TIMEOUT_MS)
+      ctx.addIssue({
+        code: 'custom',
+        path: ['SYNC_LEASE_MS'],
+        message: 'Lease must exceed request timeout',
+      });
     if (value.SYNC_MODE !== 'local') return;
     for (const key of ['SYNC_CENTRAL_URL', 'SYNC_NODE_ID', 'SYNC_NODE_TOKEN'] as const)
       if (!value[key])

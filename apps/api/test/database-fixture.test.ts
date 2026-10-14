@@ -89,6 +89,33 @@ test('fixture setup and cleanup failures use only the designated schema', async 
     await db.close();
     assert.equal(fixture.calls.filter((call) => call.startsWith('DROP SCHEMA')).length, 1);
   });
+  await t.test('startup role options preserve the isolated schema', async () => {
+    const migration = process.env.TEST_MIGRATION_DATABASE_URL!;
+    const runtime = process.env.TEST_DATABASE_URL!;
+    const configured = new URL(runtime);
+    configured.searchParams.set('options', '-c role=hexpayroll_app');
+    process.env.TEST_DATABASE_URL = configured.toString();
+    const isolated = mocks();
+    const configs: pg.PoolConfig[] = [];
+    try {
+      const db = await databaseFixture({
+        ...isolated.dependencies,
+        createPool: (config) => {
+          configs.push(config);
+          return isolated.dependencies.createPool(config);
+        },
+      });
+      assert.match(
+        configs[2]!.options!,
+        /^-c role=hexpayroll_app -c search_path=hexpayroll_phase1_test_[a-f0-9]+$/,
+      );
+      assert.equal(new URL(configs[2]!.connectionString!).searchParams.has('options'), false);
+      await db.close();
+    } finally {
+      process.env.TEST_MIGRATION_DATABASE_URL = migration;
+      process.env.TEST_DATABASE_URL = runtime;
+    }
+  });
   await t.test('unsafe and missing test URLs are rejected before pool creation', async () => {
     const fixture = mocks();
     process.env.TEST_DATABASE_URL = 'postgres://hexpayroll_app@localhost:5432/payroll_sys';
