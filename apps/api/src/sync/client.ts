@@ -7,6 +7,7 @@ import {
 } from '@hexpayroll/shared';
 import { transaction } from '../foundation/repository.js';
 import { tokenHash } from '../auth/service.js';
+import { applyInboxBatch } from './inbox.js';
 
 export interface SyncClientConfig {
   url: string;
@@ -181,6 +182,12 @@ export function startSyncWorker(
       }
       try {
         await pullNextBatch(pool, config);
+      } catch {
+        onError();
+      }
+      try {
+        const result = await applyInboxBatch(pool, await ensureNode(pool, config));
+        if (result.pending) onError();
       } catch {
         onError();
       }

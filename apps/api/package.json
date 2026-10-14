@@ -17,6 +17,7 @@
     "central:bootstrap": "node dist/cli/central-bootstrap.js",
     "central:node": "node dist/cli/central-node.js",
     "sync:import": "tsx src/cli/sync-import.ts",
+    "sync:user": "tsx src/cli/sync-user.ts",
     "auth:create-user": "tsx src/cli/create-user.ts",
     "test": "tsx --test test/*.test.ts",
     "test:local": "tsx src/cli/test-local.ts"

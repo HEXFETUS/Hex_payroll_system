@@ -11,6 +11,7 @@ import {
 } from '@hexpayroll/shared';
 import { DUMMY_PASSWORD_HASH, hashPassword, verifyPassword } from './password.js';
 import { transaction, getActor, audit } from '../foundation/repository.js';
+import { enqueueAccount } from '../sync/accounts.js';
 interface UserRow {
   id: string;
   username: string;
@@ -46,6 +47,7 @@ export function createAuthService(database: Pool) {
         ]);
         const actor = await getActor(client, row.id);
         await audit(client, actor, 'CREATE', 'auth_users', row.id, ['username', 'displayName']);
+        await enqueueAccount(client, row.id);
         return publicUser(row);
       });
     },
